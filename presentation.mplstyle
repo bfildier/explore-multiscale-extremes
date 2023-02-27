@@ -1,0 +1,17 @@
+
+axes.titlesize      : x-large   # fontsize of the axes title
+axes.labelsize      : x-large # fontsize of the x any y labels
+xtick.labelsize      : large # fontsize of the tick labels
+ytick.labelsize      : large # fontsize of the tick labels
+legend.fontsize      : medium
+figure.titlesize : xx-large      # size of the figure title (Figure.suptitle())
+figure.subplot.left    : 0.19  # the left side of the subplots of the figure
+figure.subplot.right   : 0.94    # the right side of the subplots of the figure
+figure.subplot.bottom  : 0.13    # the bottom of the subplots of the figure
+figure.subplot.top     : 0.91    # the top of the subplots of the figure
+figure.subplot.wspace  : 0.3    # the amount of width reserved for blank space between subplots,
+                                 # expressed as a fraction of the average axis width
+figure.subplot.hspace  : 0.3    # the amount of height reserved for white space between subplots,
+                                 # expressed as a fraction of the average axis height
+image.cmap   : viridis           # A colormap name, gray etc...
+
