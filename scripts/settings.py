@@ -1,0 +1,39 @@
+import os,glob,sys
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
+
+
+#---- Paths ----#
+
+DIR_DYAMOND = '/bdd/DYAMOND/SAM-4km/OUT_2D'
+DIR_DATA = '../input'
+DIR_FIG = '../figures'
+DIR_OUT = '../results'
+
+def defineDir(workdir,verbose=True):
+
+    moduledir = os.path.join(os.path.dirname(workdir),'modules')
+    fcndir = os.path.join(os.path.dirname(workdir),'functions')
+    sys.path.insert(0,moduledir)
+    sys.path.insert(0,fcndir)
+    
+    if verbose:
+        for includedir in [moduledir,fcndir]:
+            print("Own modules available:", [os.path.splitext(os.path.basename(x))[0]
+                                             for x in glob.glob(os.path.join(includedir,'*.py'))])
+    
+    return moduledir, fcndir
+
+
+#---- colors anb bounds ----#
+
+clim_specs = {'prec':(1e-2,1e2), # mm (in 30mn)
+              'PW':(10,70)}      # mm
+
+cmap_specs = {'prec':plt.cm.ocean_r,   # alternative plt.cm.bone_r
+              'PW':plt.cm.RdBu,
+              'mcs':plt.cm.get_cmap('Accent', 10)}
+
+norm_specs = {'prec':LogNorm(vmin=clim_specs['prec'][0], vmax=clim_specs['prec'][1]),
+              'PW':None}
+
