@@ -10,7 +10,6 @@ class CaseStudy():
     
     """Documentation for class CaseStudy
 
-    
     """
         
     ##-- Class constructor
