@@ -9,6 +9,7 @@ DIR_DYAMOND = '/bdd/DYAMOND/SAM-4km/OUT_2D'
 DIR_DATA = '../input'
 DIR_FIG = '../figures'
 DIR_OUT = '../results'
+DIR_TEMPDATA = '../temp'
 
 def defineDir(workdir,verbose=True):
 

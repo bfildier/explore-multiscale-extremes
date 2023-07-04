@@ -1,9 +1,14 @@
 import pickle
 import os
+import tarfile
+import shutil
+
 import numpy as np
 
 # load own modules
 from conditionalstats_chunked import *
+# load project functions
+from settings import *
 
 
 class CaseStudy():
@@ -23,7 +28,7 @@ class CaseStudy():
         """Creates a printable version of the Distribution object. Only prints the 
         attribute value when its string fits is small enough."""
 
-        out = '< DistributionChunked object:\n'
+        out = '< CaseStudy object:\n'
         # print keys
         for k in self.__dict__.keys():
             out = out+' . %s: '%k
@@ -83,14 +88,23 @@ class CaseStudy():
     def loadDistPrSliced(self):
         
         self.dict_dist_pr_sliced = {}
+        
+        # open file
+        file = tarfile.open(os.path.join(self.dir_dist_sliced,'time_slices.tar.gz'))
+        # extract file to temporary folder
+        file.extractall(DIR_TEMPDATA)
 
+        # do operations on files
         for i_t in self.range_t:
-
+            
             # load
-            dist_pr_t = pickle.load(open(os.path.join(self.dir_dist_sliced,'dist_pr_t_%d.pickle'%i_t),'rb'))
+            dist_pr_t = pickle.load(open(os.path.join(DIR_TEMPDATA,'time_slices','dist_pr_t_%d.pickle'%i_t),'rb'))
             # store
             self.dict_dist_pr_sliced[i_t] = dist_pr_t
     
+        # remove files from temporary folder
+        shutil.rmtree(os.path.join(DIR_TEMPDATA,'time_slices'))
+        
     def computePrMean(self):
         
         self.pr_mean = np.array([self.dict_dist_pr_sliced[i_t].mean for i_t in self.range_t])
