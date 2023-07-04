@@ -13,6 +13,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 from pprint import pprint
+import warnings
 
 import datetime as dt
 import re
@@ -38,8 +39,34 @@ from plot1D import *
 # own DYAMOND functions
 from fcns_load_DYAMOND_SAM import *
 
+def getTOOCANmask(i_t,df,lon_slice,lat_slice):
+    
+    # TOOCAN segmentation mask
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        toocan_seg = loadTOOCANSeg(i_t,df)[0].sel(latitude=lat_slice).sel(longitude=lon_slice)
 
-def computeAtSlice(i_t):
+    # boolean mask
+    toocan_mask = toocan_seg > 0
+    
+    return toocan_mask
+
+def getVarThresholdMask(i_t,df,lon_slice,lat_slice,mask):
+
+    # assume mask string format is $varid_$thres
+    varid,thres = tuple(mask.split('_'))
+
+    # get varid values
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        var = loadVar(i_t,df,varid)[0].sel(lat=lat_slice).sel(lon=lon_slice)
+
+    # define boolean mask
+    var_mask = var > float(thres)
+    
+    return var_mask
+    
+def computeAtSlice(i_t,lon_slice,lat_slice,region,mask):
 
     print('compute distribution @ i_t = %d ...'%i_t, end=' ')
 
@@ -47,18 +74,50 @@ def computeAtSlice(i_t):
     reltab_dyam_seg = loadRelTable('DYAMOND_SEG')
 
     #-- calculation
-    pr = loadPrec(i_t,reltab_dyam_seg).sel(lat=lat_slice)
+    pr = loadPrec(i_t,reltab_dyam_seg).sel(lat=lat_slice).sel(lon=lon_slice)
+    # data
     pr_1D = pr.data.flatten()
     
-    # init
-    dist_pr_t = Distribution(name='pr, DYAMOND-SAM tropics, i_t=%d'%i_t,nbins=50,bintype='invlogQ')
-    # compute distribution
-    dist_pr_t.computeDistribution(sample=pr_1D)
-    # compute mean value
-    dist_pr_t.computeMean(sample=pr_1D)
+    # select data in subregion
+    if mask == 'all':
+        
+        pr_1D_masked = pr_1D
+
+    elif mask == 'TOOCAN':
+      
+        toocan_mask = getTOOCANmask(i_t,reltab_dyam_seg,lon_slice,lat_slice).data.flatten()
+        
+        # valid pr values
+        pr_1D_masked = pr_1D[toocan_mask]
+        
+    elif re.compile('TOOCAN_.*').match(mask):
+        
+        # get TOOCAN mask
+        toocan_mask = getTOOCANmask(i_t,reltab_dyam_seg,lon_slice,lat_slice).data.flatten()
+        # get var mask
+        var_mask = getVarThresholdMask(i_t,reltab_dyam_seg,lon_slice,lat_slice,mask.replace("TOOCAN_","",1)).data.flatten()
+        # merge masks (boolean intersection)
+        full_mask = np.logical_and(toocan_mask,var_mask)
+        
+        # valid pr values
+        pr_1D_masked = pr_1D[full_mask]
     
+    else:
+        
+        var_mask = getVarThresholdMask(i_t,reltab_dyam_seg,lon_slice,lat_slice,mask).data.flatten()
+        
+        # valid pr values
+        pr_1D_masked = pr_1D[var_mask]
+        
+    # init
+    dist_pr_t = Distribution(name='pr, DYAMOND-SAM %s, i_t=%d'%(region,i_t),nbins=50,bintype='invlogQ')
+    # compute distribution
+    dist_pr_t.computeDistribution(sample=pr_1D_masked)
+    # compute mean value
+    dist_pr_t.computeMean(sample=pr_1D_masked)
+
     # save on disk
-    save_dir = os.path.join(DIR_OUT,'time_slices')
+    save_dir = os.path.join(DIR_OUT,region,'Prec',mask,'time_slices')
     os.makedirs(save_dir,exist_ok=True)
     pickle.dump(dist_pr_t,open(os.path.join(save_dir,'dist_pr_t_%d.pickle'%i_t),'wb'))
 
@@ -69,23 +128,32 @@ def computeAtSlice(i_t):
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Compute rain distribution at time slice index provided.')
-    parser.add_argument('-i','--index', type=int, nargs=1,
+    parser.add_argument('-i','--index', type=int, nargs=1, default=[832],
                     help='index in relation table DYAMOND-SAM:segmentationTOOCAN')
-    parser.add_argument('-n','--ninds', type=int, nargs=1, default=[1],
+    parser.add_argument('-n','--ninds', type=int, nargs=1, default=[1086],
                     help='number of indices in a row to analyze')
+    parser.add_argument('-r','--region',type=str,default='tropics',
+                    help='region of analysis')
+    parser.add_argument('-m','--mask',type=str,default='all',
+                    help='mask of subregion to analyze')
     
     args = parser.parse_args()
     i_t0 = args.index[0]
     Ni = args.ninds[0]
 
     # geographical parameters
-    lat_slice = slice(-30,30)
+    if args.region == 'tropics':
+        lon_slice = slice(None,None)
+        lat_slice = slice(-30,30)
+    else:
+        reg_coords = regionCoordsFromName(args.region)
+        lon_slice = slice(reg_coords[0]%360,reg_coords[1]%360)
+        lat_slice = slice(reg_coords[2],reg_coords[3])
     
     # compute
     for i_t in range(i_t0,i_t0+Ni):
         
-        computeAtSlice(i_t)
+        computeAtSlice(i_t,lon_slice,lat_slice,args.region,args.mask)
         
-    
     sys.exit(0)
     

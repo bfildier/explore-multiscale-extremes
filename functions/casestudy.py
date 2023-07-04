@@ -9,7 +9,6 @@ from conditionalstats_chunked import *
 class CaseStudy():
     
     """Documentation for class CaseStudy
-
     """
         
     ##-- Class constructor

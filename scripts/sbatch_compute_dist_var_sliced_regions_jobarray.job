@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Compute distribution of rainfall at each time index. Use SLURM_ARRAY_TASK_ID as time index, and loop over indices in relation table DYAMOND-SAM/TOOCAN segmentation mask
+
+#SBATCH --partition=zen16
+#SBATCH -o logs/run_%x_%j_A%A_%a.o
+#SBATCH -e logs/run_%x_%j_A%A_%a.e
+#SBATCH --nodes=1
+#SBATCH --time=02:00:00
+#SBATCH --job-name=distPRreg
+#SBATCH --mem=1g
+#SBATCH --ntasks-per-node=4
+#SBATCH --array=0-3
+
+# job information 
+cat << EOF
+------------------------------------------------------------------
+Job submit on $SLURM_SUBMIT_HOST by $SLURM_JOB_USER
+JobID=$SLURM_JOBID Running_Node=$SLURM_NODELIST 
+Node=$SLURM_JOB_NUM_NODES Task=$SLURM_NTASKS
+------------------------------------------------------------------
+EOF
+# Begin of section with executable commands
+
+echo 'source own .bashrc file'
+source /home/bfildier/.bashrc
+
+echo 'load conda environment'
+conda activate pyLMD
+
+SCRIPT_DIR=/home/bfildier/analyses/explore-multiscale-extremes/scripts
+
+regions=('tropics'
+'310E_340E_0N_20N'
+'205E_250E_0N_20N'
+'130E_165E_0N_20N'
+)
+
+# ARGUMENTS
+# m : mask (default = all)
+mask='all'
+while getopts m:v: flag
+do
+        case "${flag}" in
+		m) mask=${OPTARG}
+			 ;;
+		v) varid=${OPTARG}
+			 ;;
+                *) echo "Invalid option: -$flag" ;;
+        esac
+done
+
+echo varid = $varid
+echo mask = $mask
+echo region = ${regions[${SLURM_ARRAY_TASK_ID}]}
+
+# compute distribution at each index
+srun -n 1 -c 1 --exclusive python ${SCRIPT_DIR}/computeVarDistributionEachT.py -v $varid -r ${regions[${SLURM_ARRAY_TASK_ID}]} -m ${mask}
+
+exit 0

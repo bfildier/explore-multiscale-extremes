@@ -37,3 +37,10 @@ cmap_specs = {'prec':plt.cm.ocean_r,   # alternative plt.cm.bone_r
 norm_specs = {'prec':LogNorm(vmin=clim_specs['prec'][0], vmax=clim_specs['prec'][1]),
               'PW':None}
 
+#---- regions of analysis ----#
+
+# define boxes (xmin,xmax,ymin,ymax)
+box_1 = [310,340,0,20] # Atlantic ITCZ
+box_2 = [205,250,0,20] # Eastern Pacific ITCZ
+box_3 = [130,165,0,20] # Pacific Warm Pool
+box_4 = [-20,35,0,20] # Central Africa
