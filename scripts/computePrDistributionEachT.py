@@ -49,7 +49,7 @@ def getTOOCANmask(i_t,df,lon_slice,lat_slice):
     # boolean mask
     toocan_mask = toocan_seg > 0
     
-    return toocan_mask
+    return np.array(toocan_mask).flatten()
 
 def getVarThresholdMask(i_t,df,lon_slice,lat_slice,mask):
 
@@ -64,7 +64,7 @@ def getVarThresholdMask(i_t,df,lon_slice,lat_slice,mask):
     # define boolean mask
     var_mask = var > float(thres)
     
-    return var_mask
+    return np.array(var_mask).flatten()
     
 def computeAtSlice(i_t,lon_slice,lat_slice,region,mask):
 
@@ -76,38 +76,32 @@ def computeAtSlice(i_t,lon_slice,lat_slice,region,mask):
     #-- calculation
     pr = loadPrec(i_t,reltab_dyam_seg).sel(lat=lat_slice).sel(lon=lon_slice)
     # data
-    pr_1D = pr.data.flatten()
+    pr_1D = np.array(pr).flatten()
     
     # select data in subregion
     if mask == 'all':
         
-        pr_1D_masked = pr_1D
+        mask_final = slice(None)
 
     elif mask == 'TOOCAN':
       
-        toocan_mask = getTOOCANmask(i_t,reltab_dyam_seg,lon_slice,lat_slice).data.flatten()
-        
-        # valid pr values
-        pr_1D_masked = pr_1D[toocan_mask]
+        mask_final = getTOOCANmask(i_t,reltab_dyam_seg,lon_slice,lat_slice)
         
     elif re.compile('TOOCAN_.*').match(mask):
         
         # get TOOCAN mask
-        toocan_mask = getTOOCANmask(i_t,reltab_dyam_seg,lon_slice,lat_slice).data.flatten()
+        toocan_mask = getTOOCANmask(i_t,reltab_dyam_seg,lon_slice,lat_slice)
         # get var mask
-        var_mask = getVarThresholdMask(i_t,reltab_dyam_seg,lon_slice,lat_slice,mask.replace("TOOCAN_","",1)).data.flatten()
+        var_mask = getVarThresholdMask(i_t,reltab_dyam_seg,lon_slice,lat_slice,mask.replace("TOOCAN_","",1))
         # merge masks (boolean intersection)
-        full_mask = np.logical_and(toocan_mask,var_mask)
-        
-        # valid pr values
-        pr_1D_masked = pr_1D[full_mask]
+        mask_final = np.logical_and(toocan_mask,var_mask)
     
     else:
         
-        var_mask = getVarThresholdMask(i_t,reltab_dyam_seg,lon_slice,lat_slice,mask).data.flatten()
+        mask_final = getVarThresholdMask(i_t,reltab_dyam_seg,lon_slice,lat_slice,mask)
         
-        # valid pr values
-        pr_1D_masked = pr_1D[var_mask]
+    # valid pr values
+    pr_1D_masked = pr_1D[mask_final]
         
     # init
     dist_pr_t = Distribution(name='pr, DYAMOND-SAM %s, i_t=%d'%(region,i_t),nbins=50,bintype='invlogQ')
@@ -115,6 +109,8 @@ def computeAtSlice(i_t,lon_slice,lat_slice,region,mask):
     dist_pr_t.computeDistribution(sample=pr_1D_masked)
     # compute mean value
     dist_pr_t.computeMean(sample=pr_1D_masked)
+    # store fraction of mask
+    dist_pr_t.computeFraction(mask=mask_final)
 
     # save on disk
     save_dir = os.path.join(DIR_OUT,region,'Prec',mask,'time_slices')
