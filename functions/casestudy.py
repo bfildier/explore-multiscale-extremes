@@ -19,10 +19,11 @@ class CaseStudy():
         
     ##-- Class constructor
     
-    def __init__(self,name,region,mask='all',rel_tab_dyam_seg=None):
+    def __init__(self,name,region,mask='all',model='SAM',rel_tab_dyam_seg=None):
         
         self.name = name
         self.region = region
+        self.model = model
         self.rel_tab_dyam_seg = rel_tab_dyam_seg
         
     def __repr__(self):
@@ -63,9 +64,9 @@ class CaseStudy():
             
         return varid_str
         
-    def setDirectories(self,region,varid,mask):
+    def setDirectories(self,varid,mask):
         
-        dirname = os.path.join(DIR_OUT,region,varid,mask)
+        dirname = os.path.join(DIR_OUT,self.region,varid,mask)
         
         if varid == 'Prec':
             
@@ -165,7 +166,7 @@ class CaseStudy():
         list_dist = list(getattr(self,'dict_dist_%s_%s_sliced'%(varid_str,mask)).values())
         inds_to_ignore = list(self.times_to_ignore - self.i_t_min)
 
-        #-- initiate global distribution
+        #-- initialize global distribution
         dist = DistributionChunked(name='%s, %s, %s %s, all times'%(varid_str,mask,self.name,self.region),
                                           dist_chunks=list_dist,
                                           chunks_to_ignore=inds_to_ignore,
