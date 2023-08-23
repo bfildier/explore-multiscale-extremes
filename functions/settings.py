@@ -6,6 +6,7 @@ from matplotlib.colors import LogNorm
 #---- Paths ----#
 
 DIR_DYAMOND = '/bdd/DYAMOND/SAM-4km/OUT_2D'
+DIR_DYAMOND_PROCESSED = '/data/bfildier/DYAMOND_REGIONS'
 # DIR_RCEMIP = '/bdd/MT_WORKSPACE/REMY/RCEMIP/SAM'
 DIR_RCEMIP = '/scratchx/bfildier/RCEMIP/SAM'
 DIR_TOOCANSEG_RCEMIP = '/bdd/MT_WORKSPACE/MCS/RCE/SAM/TOOCAN/TOOCAN_v2022_04/irtb'
