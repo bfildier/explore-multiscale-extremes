@@ -77,6 +77,7 @@ class PrecipGrid():
             
             filename = 'grid.pickle'
             filepath = os.path.join(self.path_safeguard,filename)
+            print(filepath)
             
             if not os.path.isfile(filepath):
                 
@@ -228,11 +229,11 @@ class PrecipGrid():
             
             ## add the dataarray to the dataset
             # self.ds.assign(key=da_prec_regrid)
-            self.ds[key] = da_prec_regrid
-            
+            self.ds[key] = da_prec_regrid    
+        
         # remove file on disk
         print('remove old file on disk')
-        self.removeOldFile(self.outfile)
+        self.removeOldFile(self.outfilepath)
 
         # save
         print('save...')
@@ -240,9 +241,55 @@ class PrecipGrid():
 
         #close the dataset
         self.ds.close()
-    
+        
     #! BF new
-    def regrid_by_day(self,day,func='mean'):
+    def saveVarRegridded(self,day0,dayf,varid='Prec',func='mean'):
+        """
+        Save to netcdf regridded stats combined
+        """
+        
+        key = '%s_%s'%(func,varid)
+        
+        if key in list(self.ds.variables):
+            
+            print('%s already computed, skipping...'%key)
+        
+        else : 
+            
+            print('%s not computed...'%key)
+            
+            var_regrid = []
+            for i in range(day0,dayf+1):
+                
+                print('computing %s for day %d, %s...'%(key,i,self.days[i]))
+                da_day_i = self.regrid_and_save_by_day(i,varid=varid,func=func)
+                var_regrid.append(da_day_i)
+
+            ## concat the list of dataarrays along days dimensions
+            da_var_regrid = xr.concat(var_regrid, dim = 'days')
+            
+            # print('ds =',self.ds)
+            # print('xr concat =',da_prec_regrid)
+            
+            ## add the dataarray to the dataset
+            # self.ds.assign(key=da_prec_regrid)
+            self.ds[key] = da_var_regrid
+            
+        varidoutfilepath = os.path.join(self.path_safeguard,'%s.nc'%varid)  
+        
+        # remove file on disk
+        print('remove old file on disk')
+        self.removeOldFile(varidoutfilepath)
+
+        # save
+        print('save...')
+        self.ds.to_netcdf(varidoutfilepath, format='NETCDF4', mode='w')
+
+        #close the dataset
+        self.ds.close()
+        
+    #! BF new
+    def regrid_prec_by_day(self,day,func='mean'):
         """
         Compute func(precipitation) on new grid for a given day
         Return it
@@ -264,8 +311,10 @@ class PrecipGrid():
             # compute func(precipitation)
             prec_regrid_idx = getattr(self,'spatial_%s_data_from_center_to_global'%func)(prec)
             
+            # # store(first prec computed has no value)
+            # if idx !=0 : day_prec_all.append(prec_regrid_idx)
             # store(first prec computed has no value)
-            if idx !=0 : day_prec_all.append(prec_regrid_idx)
+            day_prec_all.append(prec_regrid_idx)
             
             # update prev
             precac_prev = precac_current
@@ -285,17 +334,75 @@ class PrecipGrid():
         
         return prec_regrid
         
+    #! BF new
+    def regrid_by_day(self,day,varid='Prec',func='mean'):
+        """
+        Compute func(var) on new grid for a given day
+        Return it
+        """
         
+        def regrid_time_step(idx,varid):
+            
+            # Get the data for the day
+            var_current = self.loadVar(idx,self.df,varid=varid)
+
+            # compute func(var)
+            if var_current is not None:
+                
+                var_regrid_idx = getattr(self,'spatial_%s_data_from_center_to_global'%func)(var_current)
+                
+                del var_current
+                gc.collect()
+
+            else:
+                # create an xarray filled with nans
+                var_regrid_idx = self.create_empty_array()
+                print('regrid nans')
+                
+            return var_regrid_idx
+        
+        
+        if varid == 'Prec': # special treatment to compute difference in Precac
+            
+            return self.regrid_prec_by_day(day,func=func)
+        
+        elif varid == 'LANDMASK': # special treatment to compute only once (fixed field)
+            
+            # regrid only first index
+            idx = self.index_per_days[day][0]
+            var_regrid = regrid_time_step(idx,varid)
+            var_regrid = np.expand_dims(var_regrid, axis=2)
+
+            return var_regrid    
+            
+        else:
+            
+            day_var_all = []
+            
+            for idx in self.index_per_days[day]:
+
+                # regrid time step
+                var_regrid_idx = regrid_time_step(idx,varid)
+            
+                # store(first prec computed has no value)
+                day_var_all.append(var_regrid_idx)
+
+            stacked_array = np.stack(day_var_all, axis=0)
+            ## hstack the data in a dataframe of same shape than
+            var_regrid = getattr(np,'nan%s'%func)(stacked_array, axis=0) 
+            var_regrid = np.expand_dims(var_regrid, axis=2)
+
+            return var_regrid    
     
     #! BF new
-    def regrid_and_save_by_day(self,day,func='mean'):
+    def regrid_and_save_by_day(self,day,varid='Prec',func='mean'):
         """
         Compute func(precipitation) on new grid for a given day
         Save it as netcdf file
         """
         
         filename = 'day_'+self.days[day]+'.pkl' ## +26 meanPrecip and maxprecip computed for 40 days instead of 14
-        filedir = os.path.join(self.path_safeguard,'%s_Prec'%func)
+        filedir = os.path.join(self.path_safeguard,'%s_%s'%(func,varid))
         os.makedirs(filedir,exist_ok=True)
         filepath = os.path.join(filedir,filename)
         
@@ -303,11 +410,11 @@ class PrecipGrid():
         if not os.path.isfile(filepath):
             
             # compute
-            prec_regridded = self.regrid_by_day(day,func=func)
+            var_regridded = self.regrid_by_day(day,varid=varid,func=func)
             
             # save as pickle file in the directory ${func}_Prec
             with open(filepath, 'wb') as f:
-                pickle.dump(prec_regridded, f)
+                pickle.dump(var_regridded, f)
             
         else:
             
@@ -315,9 +422,9 @@ class PrecipGrid():
             
             # load as pickle file in the directory ${func}_Prec
             with open(filepath, 'rb') as f:
-                prec_regridded = pickle.load(f)
-                
-        da_day = xr.DataArray(prec_regridded, dims=['lat_global', 'lon_global', 'days'], coords={'lat_global': self.lat_global, 'lon_global': self.lon_global, 'days': [day]})
+                var_regridded = pickle.load(f)
+            
+        da_day = xr.DataArray(var_regridded, dims=['lat_global', 'lon_global', 'days'], coords={'lat_global': self.lat_global, 'lon_global': self.lon_global, 'days': [day]})
         
         return da_day
             
@@ -472,6 +579,10 @@ class PrecipGrid():
                 X[i, j] = mid_sum+bottom_sum+top_sum+left_sum+right_sum+bottom_left_corner+bottom_right_corner+top_left_corner+top_right_corner
         return X
     
+    def create_empty_array(self):
+        
+        return np.full(self.slices_j_lon.shape,np.nan)
+    
     def spatial_mean_data_from_center_to_global(self, data_on_center):
         x = data_on_center*self.pixel_surface if type(data_on_center) == np.ndarray else data_on_center.values*self.pixel_surface
         X = np.zeros((self.n_lat, self.n_lon))
@@ -489,7 +600,7 @@ class PrecipGrid():
                 top_right_corner = x[self.i_max[i,j], self.j_max[i,j]]*self.alpha_j_max[i,j]*self.alpha_i_max[i,j]
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", category=RuntimeWarning)
-                    X[i, j] = np.nanmean(np.concatenate([mid ,bottom ,top ,left ,right ,
+                    X[i, j] = np.nansum(np.concatenate([mid ,bottom ,top ,left ,right ,
                                             np.array([bottom_left_corner ,bottom_right_corner ,top_left_corner ,top_right_corner])]))
 
         return X/self.grid_surface       
@@ -556,6 +667,34 @@ class PrecipGrid():
             df = pd.read_csv('/home/mcarenso/code/stage-2023-multiscale-extremes/input/relation_2_table_UTC_dyamond_segmentation.csv')
             df.sort_values(by='UTC',ignore_index=True,inplace=True)
         return df   
+    
+    def loadVar(self,i_t,df,varid):
+    
+        # get filename
+        root_DYAMOND = df.iloc[i_t]['path_dyamond']
+
+        # Load DYAMOND data
+        if varid in ['LLS','LLSU','LLSV']:
+            
+            file_DYAMOND = root_DYAMOND+'_%s.nc'%varid
+            path = os.path.join(DIR_DYAMOND_DIAG2D,file_DYAMOND)
+
+            if os.path.exists(path):
+                var_DYAMOND = xr.open_dataarray(path).load().sel(lon=self.lon_slice,lat=self.lat_slice)[0].squeeze(dim=['z'])
+            else:
+                var_DYAMOND = None
+            
+        else:
+            
+            file_DYAMOND = root_DYAMOND+'.%s.2D.nc'%varid
+            path = os.path.join(DIR_DYAMOND,file_DYAMOND)
+        
+            if os.path.exists(path):
+                var_DYAMOND = xr.open_dataarray(path).load().sel(lon=self.lon_slice,lat=self.lat_slice)[0]
+            else:
+                var_DYAMOND = None
+
+        return var_DYAMOND
     
     def __get_coord_border_from_centers__(self, coord_centers):
         coord_borders = list()
