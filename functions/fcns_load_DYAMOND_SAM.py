@@ -91,4 +91,4 @@ def regionCoordsFromName(name):
     coord = [(-1)**(coord_dir[i] in ['S','W'])*coord_abs[i] for i in range(len(coord_str))]
     
     return coord
-    
+
