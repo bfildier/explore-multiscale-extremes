@@ -18,8 +18,8 @@ if socket.gethostname() == 'clarity':
 else:
 
     DIR_DYAMOND = '/bdd/DYAMOND/SAM-4km/OUT_2D'
-    DIR_DYAMOND_DIAG2D = '/data/bfildier/DYAMOND/DYAMOND_REGIONS/tropics/SAM/diagnostics_2D'
-    DIR_DYAMOND_PROCESSED = '/data/bfildier/DYAMOND/DYAMOND_REGIONS'
+    DIR_DYAMOND_DIAG2D = '/data/bfildier/DYAMOND_REGIONS/tropics/SAM/diagnostics_2D'
+    DIR_DYAMOND_PROCESSED = '/data/bfildier/DYAMOND_REGIONS'
     DIR_TOOCAN_DYAMOND = None
     DIR_TOOCANSEG_DYAMOND = None
     # DIR_RCEMIP = '/bdd/MT_WORKSPACE/REMY/RCEMIP/SAM'
