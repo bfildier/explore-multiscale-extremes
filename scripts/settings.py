@@ -20,7 +20,7 @@ else:
     DIR_DYAMOND = '/bdd/DYAMOND/SAM-4km/OUT_2D'
     DIR_DYAMOND_DIAG2D = '/data/bfildier/DYAMOND_REGIONS/tropics/SAM/diagnostics_2D'
     DIR_DYAMOND_PROCESSED = '/data/bfildier/DYAMOND_REGIONS'
-    DIR_TOOCAN_DYAMOND = None
+    DIR_TOOCAN_DYAMOND = '/data/fiolleau/DYAMOND/TOOCAN/TOOCAN_v2.07/GLOBAL/2016/FileTracking'
     DIR_TOOCANSEG_DYAMOND = None
     # DIR_RCEMIP = '/bdd/MT_WORKSPACE/REMY/RCEMIP/SAM'
     DIR_RCEMIP = '/scratchx/bfildier/RCEMIP/SAM'
