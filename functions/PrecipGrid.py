@@ -2,6 +2,8 @@
 
 from settings import *
 
+from fcns_load_DYAMOND_SAM import *
+
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -375,6 +377,27 @@ class PrecipGrid():
 
             return var_regrid    
             
+        elif varid == 'MCS_label':
+            
+            # load segmentation mask for the whole day
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+
+                var_day = []
+                for idx in self.index_per_days[day]:
+                    var_day.append(loadTOOCANSeg(idx,self.df))
+
+                var_day = xr.concat(var_day,dim='time')
+
+            # regrid all times at once
+            if func == 'all':
+                labels_regrid = self.get_labels_data_from_center_to_global(var_day)
+                labels_regrid = np.expand_dims(labels_regrid, axis=3)
+            else:
+                labels_regrid = None
+            
+            return labels_regrid
+        
         else:
             
             day_var_all = []
@@ -423,8 +446,12 @@ class PrecipGrid():
             # load as pickle file in the directory ${func}_Prec
             with open(filepath, 'rb') as f:
                 var_regridded = pickle.load(f)
-            
-        da_day = xr.DataArray(var_regridded, dims=['lat_global', 'lon_global', 'days'], coords={'lat_global': self.lat_global, 'lon_global': self.lon_global, 'days': [day]})
+        
+        if varid == 'MCS_label':
+            n_MCS = var_regridded.shape[2]
+            da_day = xr.DataArray(var_regridded, dims=['lat_global', 'lon_global', 'MCS', 'days'], coords={'lat_global': self.lat_global, 'lon_global': self.lon_global, 'MCS':np.arange(n_MCS), 'days': [day]})
+        else:
+            da_day = xr.DataArray(var_regridded, dims=['lat_global', 'lon_global', 'days'], coords={'lat_global': self.lat_global, 'lon_global': self.lon_global, 'days': [day]})
         
         return da_day
             
@@ -560,6 +587,56 @@ class PrecipGrid():
                     if False : print('i', i, 'j_lon', j_lon, 'i_min', i_min, 'i_max', i_max, 'slice_i_lat', slice_i_lat, 'alpha_i_min', alpha_i_min, 'alpha_i_max', alpha_i_max, 'bottom_sum', bottom_sum, 'top_sum', top_sum, 'mid_sum', mid_sum, 'area_by_lon', area_by_lon[i, j_lon])
             
             return area_by_lon
+        
+    def get_labels_data_from_center_to_global(self, data_on_center):
+        """From segmentation mask, store 1 value of each label appearing at each location in new grid.
+        Input: daily-concatenated variable"""
+
+        n_MCS = 300 # new dimension size to store MCS labels
+        
+        x = data_on_center
+        X = np.full((self.n_lat, self.n_lon,n_MCS),np.nan)
+        X_counts = np.full((self.n_lat, self.n_lon,n_MCS),np.nan)
+        
+        for i, slice_i_lat in enumerate(self.slices_i_lat):
+            
+            if i%10 == 0: print(i,end='..')
+            
+            for j, slice_j_lon in enumerate(self.slices_j_lon[i]):
+                if self.verbose : print(slice_i_lat, slice_j_lon)
+
+                x_subsets = [x[:,slice_i_lat, slice_j_lon],
+                             x[:,self.i_min[i,j], slice_j_lon]*self.alpha_i_min[i,j],
+                             x[:,self.i_max[i,j], slice_j_lon]*self.alpha_i_max[i,j],
+                             x[:,slice_i_lat, self.j_min[i,j]]*self.alpha_j_min[i,j],
+                             x[:,slice_i_lat, self.j_max[i,j]]*self.alpha_j_max[i,j],
+                             x[:,self.i_min[i,j], self.j_min[i,j]]*self.alpha_j_min[i,j]*self.alpha_i_min[i,j],
+                             x[:,self.i_min[i,j], self.j_max[i,j]]*self.alpha_j_max[i,j]*self.alpha_i_min[i,j],
+                             x[:,self.i_max[i,j], self.j_min[i,j]]*self.alpha_j_min[i,j]*self.alpha_i_max[i,j],
+                             x[:,self.i_max[i,j], self.j_max[i,j]]*self.alpha_j_max[i,j]*self.alpha_i_max[i,j]]
+            
+                x_sub_unique = []
+                
+                for x_subset in x_subsets:
+                    
+                    arr = np.array(x_subset).flatten()
+                    
+                    unique, unique_counts = np.unique(arr[~np.isnan(arr)].astype(int),return_counts=True)
+                    x_sub_unique.append(unique)
+                
+                x_unique, x_counts = np.unique(np.hstack(x_sub_unique),return_counts=True)
+                n_labs = len(x_unique)
+                X[i, j,:n_labs] = x_unique
+                # X_counts[i,j,:n_labs] = x_counts # How to combine counts from counts ?? linear combination using return_counts, return_index? That should be doable
+                
+        return X#, X_counts
+        
+        
+    def spatial_max_and_label_from_center_to_global(self, data_on_center):
+        """From segmentation mask, store the value of MCS label contributing to the maximum value at each location in new grid.
+        Return: max value and label"""
+        
+        pass    
         
     def sum_data_from_center_to_global(self, data_on_center):
         x = data_on_center

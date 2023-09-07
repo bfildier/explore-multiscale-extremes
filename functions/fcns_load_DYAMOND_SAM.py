@@ -43,8 +43,17 @@ def loadRelTable(which='DYAMOND_SEG'):
     return df
 
 def loadTOOCANSeg(i_t,df):
+
+    full_path = '/'+df.iloc[i_t]['img_seg_path']
     
-    path_TOOCAN = '/'+df.iloc[i_t]['img_seg_path']
+    if DIR_TOOCANSEG_DYAMOND is None:
+        path_TOOCAN = full_path
+    else:
+
+        filename = os.path.basename(full_path)
+        date = os.path.basename(os.path.dirname(full_path))
+        path_TOOCAN = os.path.join(DIR_TOOCANSEG_DYAMOND,date,filename)
+        
     # Load TOOCAN data
     img_TOOCAN = xr.open_dataarray(path_TOOCAN)
     
