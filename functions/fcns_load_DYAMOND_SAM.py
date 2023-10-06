@@ -70,6 +70,21 @@ def loadVar(i_t,df,varid):
     
     return var_DYAMOND
 
+def loadAllMCSs(path_to_dir,fun_load_TOOCAN):
+    """load TOOCAN objects"""
+    
+    # where stored
+    paths_TOOCAN = glob.glob(os.path.join(path_to_dir,'*.gz'))
+    N_paths = len(paths_TOOCAN)
+    # load
+    toocan = []
+    for i_p in range(N_paths):
+        path = paths_TOOCAN[i_p]
+        print('load %s'%path)
+        toocan.extend(fun_load_TOOCAN(path))
+    
+    return toocan
+
 def regionNameFromCoord(box):
     
     for coord,coordname in zip(box,['lonmin','lonmax','latmin','latmax']):
