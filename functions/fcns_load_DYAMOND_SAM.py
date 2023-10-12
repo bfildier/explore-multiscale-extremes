@@ -2,6 +2,7 @@ import xarray as xr
 import gc,os
 import pandas as pd
 import re
+import numpy as np
 
 from settings import *
 
@@ -69,6 +70,23 @@ def loadVar(i_t,df,varid):
     var_DYAMOND = xr.open_dataarray(os.path.join(DIR_DYAMOND,file_DYAMOND))
     
     return var_DYAMOND
+
+def getCoords2D(dataset,slice_lon,slice_lat):
+    
+    # get correct coordinate names in dataset
+    for prefix in 'lat','lon':
+        r = re.compile("%s.*"%prefix)
+        coord = list(filter(r.match,list(dataset.coords.dims)))[0]
+        setattr(thismodule,'%s_coord'%prefix,coord)
+    
+    # extract coordinates
+    lat_1D = dataset[lat_coord].sel({lat_coord:slice_lat})
+    lon_1D = dataset[lon_coord].sel({lon_coord:slice_lon})
+
+    # compute 2D meshgrid of coordinates
+    lonarray,latarray = np.meshgrid(lon_1D,lat_1D)
+    
+    return lonarray,latarray
 
 def loadAllMCSs(path_to_dir,fun_load_TOOCAN):
     """load TOOCAN objects"""
