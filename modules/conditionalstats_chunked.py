@@ -487,7 +487,7 @@ class DistributionChunked(Distribution):
 #         if method == 'random':
 
 #             # Here, look at all points, in random order
-            
+
 #             indices = list(range(self.size))
 #             np.random.shuffle(indices)
 
@@ -652,3 +652,31 @@ class DistributionChunked(Distribution):
 #         return cdf
     
     
+    
+    
+    ##---- colocate with position in xyt sample ----##
+    
+    def getBinIndices(self,sample):
+        """Build-in calculation of the position of the distribution bins in an input sample. sample is a flattened array. Returns an flattened array of these indices, with the same size as input sample."""
+        
+        digit_indices = np.digitize(sample.flatten(), self.bins, right = True)
+        
+        return digit_indices
+    
+    
+    ##---- compute chunked conditional distributions ----##
+    
+#     def combineMcsAgeComposites(self,N_all_bins,diag_all_bins,diag,metric):
+#         """Linear combination of diagnostic computed at each time slice in each bin of the global distribution of rain.
+#         E.g. mean(MCS age) in bin i = 1/N(i) * (Sum_t n_t mean_t(i)(MCS age, i)) where n_t(i) is the sample size of bin i at
+#         time t and N(i) is the total sample size.
+        
+#         Arguments:
+#         - 
+#         """
+        
+#         if diag in ['min','max']:
+            
+            
+        
+        

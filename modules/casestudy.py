@@ -49,12 +49,23 @@ class CaseStudy():
         return out
         
     def setSimulationSpecs(self,i_t_min,i_t_max,lat_slice=None,lon_slice=None):
+        """Set time bounds and space bounds for analysis. Could be specified in a yaml file instead"""
         
         self.i_t_min = i_t_min
         self.i_t_max = i_t_max
         self.range_t = range(i_t_min,i_t_max+1)
-        self.lat_slice = lat_slice
-        self.lon_slice = lon_slice
+        
+        # latitude
+        if lat_slice is None:
+            coord_slices['lat'][self.region] # ! adapt here for other regions than tropics
+        else:
+            self.lat_slice = lat_slice
+
+        # longitude
+        if lon_slice is None:
+            coord_slices['lon'][self.region] # ! adapt here for other regions than tropics
+        else:
+            self.lon_slice = lon_slice
         
     def getVaridStr(self,varid):
         
@@ -140,6 +151,19 @@ class CaseStudy():
         
         self.loadDistSliced(varid='Prec',mask=mask)
         
+    def loadDistMerged(self,varid,mask):
+        
+        varid_str = self.getVaridStr(varid)
+        dir_load = 'dir_dist_%s_%s_sliced'%(varid_str,mask)
+        
+        # load
+        dist = pickle.load(open(os.path.join(dir_load,'dist_%s.pickle'%varid_str),'rb'))
+        
+        # store for later use
+        dist_name = 'dist_%s_%s'%(varid_str,mask)
+        setattr(self,dist_name,dist)
+        
+        
     def computeMean(self,varid,mask='all'):
         
         varid_str = self.getVaridStr(varid)
@@ -178,7 +202,21 @@ class CaseStudy():
         dist.computeDistribution()
         
         # save
-        setattr(self,'dist_%s_%s'%(varid_str,mask),dist)
+        dist_name = 'dist_%s_%s'%(varid_str,mask)
+        setattr(self,dist_name,dist)
+        
     
-            
+    def loadMcsAgeDiagnostic(self):
+        
+        pass
+
+    
+    def combineMcsAgeDiagnostic(self):
+        
+        pass
+    
+#    WRITE HERE function that loads MCS age diagnostics and save them in each distribution at time t
+#    merge all times to get full mapping of MCS age onto distribution and save it in cs.dist_XX (DistributionChunked)
+#
+#    then test it in explore_lifecycle_mapping.ipynb
     

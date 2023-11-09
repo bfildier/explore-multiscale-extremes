@@ -3,6 +3,7 @@ import gc,os
 import pandas as pd
 import re
 import numpy as np
+import warnings
 
 from settings import *
 
@@ -56,7 +57,9 @@ def loadTOOCANSeg(i_t,df):
         path_TOOCAN = os.path.join(DIR_TOOCANSEG_DYAMOND,date,filename)
         
     # Load TOOCAN data
-    img_TOOCAN = xr.open_dataarray(path_TOOCAN)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        img_TOOCAN = xr.open_dataarray(path_TOOCAN)
     
     return img_TOOCAN
 

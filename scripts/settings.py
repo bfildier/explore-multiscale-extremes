@@ -21,7 +21,7 @@ else:
     DIR_DYAMOND_DIAG2D = '/data/bfildier/DYAMOND_REGIONS/tropics/SAM/diagnostics_2D'
     DIR_DYAMOND_PROCESSED = '/data/bfildier/DYAMOND_REGIONS'
     DIR_TOOCAN_DYAMOND = '/data/fiolleau/DYAMOND/TOOCAN/TOOCAN_v2.07/GLOBAL/2016/FileTracking'
-    DIR_TOOCANSEG_DYAMOND = None
+    DIR_TOOCANSEG_DYAMOND = '/data/fiolleau/DYAMOND/TOOCAN/TOOCAN_v2.07/GLOBAL/2016'
     # DIR_RCEMIP = '/bdd/MT_WORKSPACE/REMY/RCEMIP/SAM'
     DIR_RCEMIP = '/scratchx/bfildier/RCEMIP/SAM'
     DIR_TOOCANSEG_RCEMIP = '/bdd/MT_WORKSPACE/MCS/RCE/SAM/TOOCAN/TOOCAN_v2022_04/irtb'
@@ -62,7 +62,12 @@ norm_specs = {'prec':LogNorm(vmin=clim_specs['prec'][0], vmax=clim_specs['prec']
 #---- regions of analysis ----#
 
 # define boxes (xmin,xmax,ymin,ymax)
+box_0 = [0,360,-30,30] # whole tropics
 box_1 = [310,340,0,20] # Atlantic ITCZ
 box_2 = [205,250,0,20] # Eastern Pacific ITCZ
 box_3 = [130,165,0,20] # Pacific Warm Pool
 box_4 = [-20,35,0,20] # Central Africa
+
+# coord slices
+coord_slices = {'lat':{'tropics':slice(-30,30)},
+                'lon':{'tropics':None}}

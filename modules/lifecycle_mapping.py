@@ -9,6 +9,8 @@ from math import log10,ceil,floor,exp
 import time
 import sys
 
+import warnings
+
 from datetime import datetime as dt
 from datetime import timedelta
 
@@ -16,22 +18,23 @@ class LifeCycleMapping():
     
     ###--- Class constructor
     
-    def __init__(self,dist,relation_table,toocan):
+    def __init__(self,relation_table,toocan_timetable,toocan):
 
         """Constructor for class LifeCycleMapping.
         Arguments:
-        - dist: object of class Distribution.
         - relation_table: data frame mapping simulation files with TOOCAN segmentation masks.
+        - toocan_timetable: table for mapping TOOCAN objects and their birth and death time step and duration
         - toocan: list of TOOCAN objects.
         """
         
-        self.dist = dist
+        # self.dist = dist
         self.relation_table = relation_table
+        self.toocan_timetable = toocan_timetable
         self.toocan = toocan
-        self.N_MCS = len(self.toocan)
+        self.N_MCS = len(self.toocan) if self.toocan is not None else 0
         
         # store list of toocan attributes to speed up later calculation
-        self.labels_toocan = [self.toocan[i].label for i in range(self.N_MCS)]
+        self.labels_toocan = [self.toocan[i].label for i in range(self.N_MCS)] if self.toocan is not None else []
         
         # store list of toocan labels that appear for several MCSs
         self.findDuplicateLabels()
@@ -40,6 +43,7 @@ class LifeCycleMapping():
         # # store list of indices accessible from labels --- TAKES TOO LONG
         # self.defineMappingLabelToIndex()
         
+        # store indices i_t for birth and death and 
         
     def findDuplicateLabels(self):
         """Save TOOCAN labels appearing several times"""
@@ -98,6 +102,39 @@ class LifeCycleMapping():
 #         # convert array to integer (nans become large negative numbers)
 #         self.toocan_index_of_label = np.asarray(inds_labels_all,dtype=int)
         
+    def buildTimeTable(self):
+        """Construct a time table where rank i corresponds to MCS label i, and each column is a time metric:
+        i_t_min, i_t_max (indices in DYAMOND relation table), duration. Stores in self.time_table.
+        
+        Ignores systems with identical labels.
+        
+        Takes 2mn46 for DYAMOND 1 - SAM, 347106 systems."""
+
+        # initialize
+        self.time_table = pd.DataFrame(columns=['label','i_t_min','i_t_max','duration'], index=np.arange(np.nanmax(labels_toocan)))
+
+        # fill where label is found
+        for i_MCS in range(len(toocan)):
+
+            MCS = self.toocan[i_MCS]
+
+            # label
+            label = MCS.label
+
+            if label in self.labels_valid:
+                
+                # birth
+                i_t_min = np.where(self.relation_table.UTC == MCS.Utime_Init)[0][0]
+
+                # death
+                i_t_max = np.where(self.relation_table.UTC == MCS.Utime_End)[0][0]
+
+                # duration (equal (i_t_max-i_t_min+1)*0.5 hrs)
+                duration = MCS.duration
+
+                # save
+                self.time_table.loc[label] = pd.Series({'label':label,'i_t_min':i_t_min,'i_t_max':i_t_max,'duration':duration})
+            
         
     ###--- class Methods
     
@@ -114,7 +151,7 @@ class LifeCycleMapping():
     
         date_str = self.toocan[i_MCS].clusters.Utime[j_t_MCS]
         date_day = int(date_str)
-        date_30mn = int(str(date_str).split('.')[-1])
+        date_30mn = int((str(date_str).split('.')[-1]).ljust(2,'0')) #ljust
         # compute time delta
         td = timedelta(days = int(date_str),seconds = date_30mn*30*60)
         
@@ -192,7 +229,7 @@ class LifeCycleMapping():
                 
     #--- i_t, segmentation mask --> mask of MCS ages
     
-    def getLabelsInSegmentationMask(self,segmask):
+    def getLabelsInSegMask(self,segmask):
         """Returns a list of labels appearing in segmentation mask"""
 
         seg_1D = segmask.values.flatten()
@@ -200,7 +237,14 @@ class LifeCycleMapping():
 
         return np.unique(np.array(seg_1D_nonans,dtype=int))
     
-    def computeAgeMask(self,i_t,segmask,metric='age'):
+    
+    # NOT EFFICIENT VERSION: 
+    # execution time: 
+    # 2016 labels in current segmentation mask
+    # CPU times: user 9min 26s, sys: 3.57 s, total: 9min 30s
+    # Wall time: 9min 30s
+    
+    def computeAgesFromSegMask_old(self,i_t,segmask,metric='age'):
         """Compute an array of MCS ages at MCS label locations in segmentation mask.
         
         i_t, segmentation mask ---> mask of MCS ages
@@ -212,37 +256,156 @@ class LifeCycleMapping():
         """
     
         # all labels in segmask
-        labels_in_segmask = self.getLabelsInSegmentationMask(segmask)
+        labels_in_segmask = self.getLabelsInSegMask(segmask)
+        print('%d labels in current segmentation mask'%len(labels_in_segmask))
+        # flatten segmentation mask to fill
+        segmask_flat = segmask.values.flatten()
         
         #- compute sequence of ages in segmentation mask
         ages = {}
+        age_mask_1D = np.full(segmask_flat.shape,np.nan)
+        
+        # fill
         for label in labels_in_segmask:
             
             if label in self.labels_valid:
+                
+                # print(label,end='..')
             
                 ages[label] = self.computeMCSAgeMetrics(i_t,label,segmask,metric=metric)
+                
+                # fill age mask            
+                age_mask_1D[segmask_flat == label] = ages[label]
+
+        print()
             
-        #- create mask of ages
-        age_mask = np.full(segmask.shape,np.nan)
-        # fill
-        for label in ages.keys():
-            
-            age_mask[segmask == label] = ages[label]
+        # reshape to 2D 
+        age_mask = np.reshape(age_mask_1D,segmask.shape)
         
         return age_mask
     
-    def sampleToMeanMCSAge(self,i_t,sample,normalize=False):
-        """Compute an array of MCS ages from a sample for each percntile.
+    
+    def computeAgesFromSegMask(self,i_t,segmask,metric='age'):
+        """Compute an array of MCS ages at MCS label locations in segmentation mask.
+        
+        i_t, segmentation mask ---> mask of MCS ages
+        
+        Arguments:
+        - i_t: time index in relation table
+        - segmask: TOOCAN segmentation mask at time i_t
+        - metric: metric to compute (age, norm_age, etc.)
+        """
+    
+        #- step 1. Mask of nans and flatten segmentation mask without nans
+
+        # flatten segmask
+        segmask_1D = segmask.flatten()
+        # mask of nans
+        mask_nans_segmask_1D = np.isnan(segmask_1D)
+        # remove nans
+        segmask_1D_valid = segmask_1D[~mask_nans_segmask_1D]
+        
+        #- step 2. Take time metrics at labels ## CAREFUL, indices must be equal to labels in toocan_timetable
+
+        # births
+        i_t_min_valid = np.array(self.toocan_timetable['i_t_min'].take(segmask_1D_valid))
+        # deaths
+        i_t_max_valid = np.array(self.toocan_timetable['i_t_max'].take(segmask_1D_valid))
+        # durations
+        durations_valid = np.array(self.toocan_timetable['duration'].take(segmask_1D_valid))
+
+        if metric == 'age':
+            # age
+            metric_valid = (i_t-i_t_min_valid)/2
+        elif metric == 'norm_age':
+            # normalized age
+            metric_valid = (i_t-i_t_min_valid)/2/durations_valid
+        elif metric == 'duration':
+            # duration
+            metric_valid = durations_valid
+        
+        #- step 3. Insert in 1D arrays with nans
+
+        metric_1D = np.full(segmask_1D.shape,np.nan)
+        metric_1D[~mask_nans_segmask_1D] = metric_valid
+        
+        #- step 4. reshape
+
+        metric = np.reshape(metric_1D, segmask.shape)
+        
+        #- return result
+        
+        return metric
+        
+    
+    def compositeMcsAgeOnDist(self,i_t,segmask,sample,dist_var,xymask=True,mask_T='allT',diag='mean',metric='age'):
+        """Compute an array of MCS ages from a sample for each percentile.
         
         i_t, precip values ---> MCS age composited onto precip distribution
         
         Arguments:
         - i_t: time index in relation table
+        - segmask: TOOCAN segmentation mask at time i_t
         - sample: values at time i_t for the variable used to compute distribution
+        - xymask: spatial mask on which to restrict calculation of diagnostic (e.g. 'land','ocean', etc.) fed as a flattened 1D array
+        - mask_T: name of mask on TOOCAN MCS lifetime on which to restrict calculation of diagnostic (e.g. allT, min5hr, etc.)
+        - diagnostic: how to combine the metric quantified in a given bin (mean, var, etc.)
+        - metric: metric to compute (age, norm_age, etc.)
         """
+
+        # 1. compute array of metric
+        metric = self.computeAgesFromSegMask(i_t,segmask,metric).flatten()
         
-        pass
-    
+        # 1'. compute mask of durations (from mask_T)
+        duration = self.computeAgesFromSegMask(i_t,segmask,'duration').flatten()
+        
+        if mask_T == 'allT':
+            
+            Tmask = np.full(duration.size,True)
+            
+        elif mask_T == 'min5hr':
+            
+            Tmask = np.greater(duration,10)
+        
+        # 2. digitize sample values in distribution bins
+        digits = dist_var.getBinIndices(sample) # (flattened)
+        N_dig = dist_var.ranks.size
+        
+        # 3. for each bin i, apply diagnostic to the metric and save sample size
+        # init
+        diag_all_bins = np.full(N_dig,np.nan)
+        N_all_bins = np.full(N_dig,np.nan)
+        N_valid_all_bins = np.full(N_dig,np.nan)
+        # loop
+        for i_bin in range(0,N_dig):
+
+            # x-y mask in bin i
+            mask_bin = (digits == i_bin)
+            # take intersection with spatial mask
+            mask_bin = np.logical_and(mask_bin,xymask)
+            # take intersection with MCS duration mask
+            mask_bin = np.logical_and(mask_bin,Tmask)
+            
+            # extract age in bin
+            age_in_bin = metric[mask_bin]
+
+            # get bin sample size
+            N_all_bins[i_bin] = age_in_bin.size
+            N_valid_all_bins[i_bin] = np.sum(~np.isnan(age_in_bin))
+            # if N_valid_all_bins[i_bin] == 0:
+            #     print('bin #%d = all nans'%i_bin)
+            
+            # apply diagnostic
+            if diag in ['mean','max','var','min']:
+                
+                if N_valid_all_bins[i_bin] > 0:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        diag_all_bins[i_bin] = getattr(np,'nan%s'%diag)(age_in_bin)
+                else:
+                    diag_all_bins[i_bin] = 0
+
+        return diag_all_bins, N_all_bins, N_valid_all_bins
     
         
         
