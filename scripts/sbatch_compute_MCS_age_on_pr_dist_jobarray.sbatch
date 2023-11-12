@@ -35,12 +35,20 @@ SCRIPT_DIR=/home/bfildier/analyses/explore-multiscale-extremes/scripts
 # r : region (default = tropics)
 region='tropics'
 # m : mask (default = all)
+#----------------
 mask_ref='all'
-
+#----------------
 # mask_xy='allXY'
 mask_xy='ocean'
-mask_T='allT'
+# mask_xy='land'
+#----------------
+# mask_T='allT'
 # mask_T='min5hr'
+# mask_T='min10hr'
+mask_T='btw5and10hr'
+#----------------
+metric='norm_age'
+# metric='age'
 
 while getopts r:m flag
 do
@@ -58,7 +66,7 @@ echo mask_xy = "${mask_xy}"
 echo mask_T = "${mask_T}"
 
 # compute distribution at each index
-srun -n 1 -c 1 --exclusive python ${SCRIPT_DIR}/computeMcsAgeOnPrDistributionEachT.py -i ${SLURM_ARRAY_TASK_ID} -n 100 -r ${region} -m ${mask_ref} --mask_xy ${mask_xy} --mask_T ${mask_T}
+srun -n 1 -c 1 --exclusive python ${SCRIPT_DIR}/computeMcsAgeOnPrDistributionEachT.py -i ${SLURM_ARRAY_TASK_ID} -n 100 -r ${region} -m ${mask_ref} --mask_xy ${mask_xy} --mask_T ${mask_T} --metric ${metric}
 #srun -n 1 -c 1 --exclusive python ${SCRIPT_DIR}/computeMcsAgeOnPrDistributionEachT.py -i 901 -n 1 -r ${region} -m ${mask_ref} --mask_xy ${mask_xy}
 
 exit 0

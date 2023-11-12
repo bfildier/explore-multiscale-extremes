@@ -8,7 +8,7 @@ import numpy as np
 from math import log10,ceil,floor,exp
 import time
 import sys
-
+import re
 import warnings
 
 from datetime import datetime as dt
@@ -254,7 +254,7 @@ class LifeCycleMapping():
         - seg_mask: TOOCAN segmentation mask at time i_t
         - metric: metric to compute (age, norm_age, etc.)
         """
-    
+        
         # all labels in segmask
         labels_in_segmask = self.getLabelsInSegMask(segmask)
         print('%d labels in current segmentation mask'%len(labels_in_segmask))
@@ -359,13 +359,27 @@ class LifeCycleMapping():
         # 1'. compute mask of durations (from mask_T)
         duration = self.computeAgesFromSegMask(i_t,segmask,'duration').flatten()
         
+        dt = 0.5
         if mask_T == 'allT':
             
             Tmask = np.full(duration.size,True)
             
-        elif mask_T == 'min5hr':
+        elif re.compile('min.*hr').match(mask_T):
             
-            Tmask = np.greater(duration,10)
+            # get Tmin from argument
+            Tmin = int(mask_T[3:][:-2])
+            # extract mask
+            Tmask = np.greater(duration,int(Tmin/dt))
+            
+        elif re.compile('btw.*and.*hr').match(mask_T):
+            
+            # get Tbounds from argument
+            Tmin = int(mask_T.split('and')[0][3:])
+            Tmax = int(mask_T.split('and')[1][:-2])
+            # extract mask
+            Tmask_min = np.greater(duration,int(Tmin/dt))
+            Tmask_max = np.logical_not(np.greater(duration,int(Tmax/dt)))
+            Tmask = np.logical_and(Tmask_min,Tmask_max)
         
         # 2. digitize sample values in distribution bins
         digits = dist_var.getBinIndices(sample) # (flattened)

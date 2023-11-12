@@ -9,8 +9,6 @@
 
 
 
-
-
 # 3. combine diagnostics from all times in cs.dist_var (DistributionChunked)
 
 def combineMcsAgeDiagnostic(cs,diag,metric):
