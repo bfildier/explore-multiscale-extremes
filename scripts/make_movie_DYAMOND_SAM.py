@@ -240,7 +240,8 @@ if __name__ == "__main__":
     # cmap_mcs = plt.cm.get_cmap('rainbow', 10)
     cmap_mcs = plt.cm.get_cmap('Accent', 10)
     clim = (10,70)
-    lon_lim = (280,100)
+    # lon_lim = (280,100)
+    lon_lim = (100,280)
     lat_lim = (-10,30)
     slice_lat = slice(*lat_lim)
     
@@ -287,7 +288,7 @@ if __name__ == "__main__":
     #-- Make movie
     
     moviedir = '../movies/'
-    movie_name = 'toocan_DYAMOND_SAM'
+    movie_name = 'toocan_DYAMOND_SAM_%dE%dE'%(lon_lim)
     movie_path = os.path.join(moviedir, '%s.mp4'%(movie_name))
 
     with warnings.catch_warnings():

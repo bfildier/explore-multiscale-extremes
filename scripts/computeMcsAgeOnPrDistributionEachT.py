@@ -330,7 +330,6 @@ if __name__ == "__main__":
                         
         computeAtSlice(i_t,cs,lcm,dist_var,mask_xy,mask_T,diag,metric,save_dir)
         
-        
     
 #     # ADAPT
 #         # open file

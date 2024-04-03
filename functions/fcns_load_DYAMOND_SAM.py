@@ -8,7 +8,7 @@ import warnings
 from settings import *
 
 ## current script object
-thismodule = sys.modules[__name__]
+fcnload_module = sys.modules[__name__]
 
 def loadPrecac(i_t,df):
     
@@ -80,7 +80,7 @@ def getCoords2D(dataset,slice_lon,slice_lat):
     for prefix in 'lat','lon':
         r = re.compile("%s.*"%prefix)
         coord = list(filter(r.match,list(dataset.coords.dims)))[0]
-        setattr(thismodule,'%s_coord'%prefix,coord)
+        setattr(fcnload_module,'%s_coord'%prefix,coord)
     
     # extract coordinates
     lat_1D = dataset[lat_coord].sel({lat_coord:slice_lat})
@@ -112,13 +112,13 @@ def regionNameFromCoord(box):
         
         if coord < 0 : 
 
-            if re.compile('lon.*').match(coordname): setattr(thismodule,coordname,"%sW"%abs(coord))
-            if re.compile('lat.*').match(coordname): setattr(thismodule,coordname,"%sS"%abs(coord))
+            if re.compile('lon.*').match(coordname): setattr(fcnload_module,coordname,"%sW"%abs(coord))
+            if re.compile('lat.*').match(coordname): setattr(fcnload_module,coordname,"%sS"%abs(coord))
             
         else:
             
-            if re.compile('lon.*').match(coordname): setattr(thismodule,coordname,"%sE"%coord)
-            if re.compile('lat.*').match(coordname): setattr(thismodule,coordname,"%sN"%coord)
+            if re.compile('lon.*').match(coordname): setattr(fcnload_module,coordname,"%sE"%coord)
+            if re.compile('lat.*').match(coordname): setattr(fcnload_module,coordname,"%sN"%coord)
     
     name = "%s_%s_%s_%s"%(lonmin,lonmax,latmin,latmax)
     

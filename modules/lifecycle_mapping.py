@@ -11,23 +11,25 @@ import sys
 import re
 import warnings
 
-from datetime import datetime as dt
-from datetime import timedelta
+import datetime as dt
 
 class LifeCycleMapping():
     
     ###--- Class constructor
     
-    def __init__(self,relation_table,toocan_timetable,toocan):
+    def __init__(self,relation_table,toocan_timetable,toocan,timestep=0.5):
 
         """Constructor for class LifeCycleMapping.
+        
         Arguments:
+        - timestep: model time step in hours
         - relation_table: data frame mapping simulation files with TOOCAN segmentation masks.
         - toocan_timetable: table for mapping TOOCAN objects and their birth and death time step and duration
         - toocan: list of TOOCAN objects.
         """
         
         # self.dist = dist
+        self.timestep = timestep # in hours
         self.relation_table = relation_table
         self.toocan_timetable = toocan_timetable
         self.toocan = toocan
@@ -68,39 +70,91 @@ class LifeCycleMapping():
         All other indices are nans; and duplicate labels in toocan are ignored.
         """
         
-        # init
-        self.toocan_index_of_label = np.full(np.nanmax(self.labels_toocan)+1,np.nan)
+        # slow method, but that works
         
-        # fill 
-        for i_toocan in range(len(self.labels_toocan)):
+#         # init
+#         self.toocan_index_of_label = np.full(np.nanmax(self.labels_toocan)+1,np.nan)
+        
+#         # fill 
+#         for i_toocan in range(len(self.labels_toocan)):
             
-            label = self.labels_toocan[i_toocan]
+#             label = self.labels_toocan[i_toocan]
             
-            if label in self.labels_valid:
+#             if label in self.labels_valid:
                 
-                self.toocan_index_of_label[label] = i_toocan
+#                 self.toocan_index_of_label[label] = i_toocan
         
-        # Old method, to fix
+#         # Old method (vector-based), to fix
         
-#         # 0. initiate with nans
-#         inds_labels_all = np.array(np.arange(0,np.nanmax(self.labels_toocan)+1),dtype=float)
-#         inds_labels_all[0] = np.nan
+        # 0. initiate with nans
+        inds_labels_all = np.array(np.arange(0,np.nanmax(self.labels_toocan)+1),dtype=float)
+        inds_labels_all[0] = np.nan
 
-#         # 1. Nans
-#         # mask of valid label indices
-#         mask_labels_valid = np.in1d(inds_labels_all,self.labels_valid)
-#         # replace invalid with nans
-#         inds_labels_all[~mask_labels_valid] = np.nan
+        # 1. Nans
+        # a. mask of valid label indices
+        mask_labels_valid = np.in1d(inds_labels_all,self.labels_valid)
+        # b. replace invalid with nans
+        inds_labels_all[~mask_labels_valid] = np.nan
 
-#         # 2. Indices
-#         # mask of valid toocan labels
-#         mask_toocan_labels_valid = np.in1d(self.labels_toocan,self.labels_valid)
-#         # find indices of valid toocan labels
-#         ind_toocan_valid = np.where(mask_toocan_labels_valid)[0]
-#         # assign 
-#         inds_labels_all[mask_labels_valid] = ind_toocan_valid
-#         # convert array to integer (nans become large negative numbers)
-#         self.toocan_index_of_label = np.asarray(inds_labels_all,dtype=int)
+        # 2. Indices
+        # a. mask of valid toocan labels
+        mask_toocan_labels_valid = np.in1d(self.labels_toocan,self.labels_valid)
+        # b. extract order of valid toocan labels
+        toocan_labels_valid_unordered = np.array(self.labels_toocan)[mask_toocan_labels_valid]
+        order_toocan_valid = sorted(range(len(toocan_labels_valid_unordered)), key=lambda k: toocan_labels_valid_unordered[k])
+
+        # find indices of valid toocan labels
+        ind_toocan_valid = np.where(mask_toocan_labels_valid)[0]
+        # assign them, in order as determined in 2.b
+        inds_labels_all[mask_labels_valid] = np.take(np.array(ind_toocan_valid,dtype=int),order_toocan_valid)
+        # convert array to integer (nans become large negative numbers)
+        self.toocan_index_of_label = np.asarray(inds_labels_all,dtype=int)
+        
+        
+# ## TO DEBUG method LifeCycleMapping.defineMappingLabelToIndex()
+
+# ex_labels_toocan = [1,3,4,5,7,8,9,10]
+# # max_lab_toocan = 
+# ex_labels_valid = [3,5,7,8,9]
+
+# # 0. initiate with nans
+# # inds_labels_all = np.array(np.arange(0,np.nanmax(self.labels_toocan)+1),dtype=float)
+# inds_labels_all = np.array(np.arange(0,np.nanmax(ex_labels_toocan)+1),dtype=float)
+# print('inds_labels_all:',inds_labels_all)
+# inds_labels_all[0] = np.nan
+# print('inds_labels_all:',inds_labels_all)
+
+# # 1. Nans
+# # mask of valid label indices
+# # mask_labels_valid = np.in1d(inds_labels_all,self.labels_valid)
+# mask_labels_valid = np.in1d(inds_labels_all,ex_labels_valid)
+# print('mask_labels_valid:',mask_labels_valid)
+
+# # replace invalid with nans
+# inds_labels_all[~mask_labels_valid] = np.nan
+# print('inds_labels_all:',inds_labels_all)
+
+# # 2. Indices
+# # mask of valid toocan labels
+# # mask_toocan_labels_valid = np.in1d(self.labels_toocan,self.labels_valid)
+# mask_toocan_labels_valid = np.in1d(ex_labels_toocan,ex_labels_valid)
+# print('mask_toocan_labels_valid:',mask_toocan_labels_valid)
+
+# # find indices of valid toocan labels
+# ind_toocan_valid = np.where(mask_toocan_labels_valid)[0]
+# print('ind_toocan_valid:',ind_toocan_valid)
+# # assign 
+# inds_labels_all[mask_labels_valid] = np.array(ind_toocan_valid,dtype=int)
+# print('inds_labels_all:',inds_labels_all)
+# inds_labels_all = np.asarray(inds_labels_all,dtype=int)
+# # inds_labels_all[inds_labels_all < 0] = np.nan
+# print('inds_labels_all:',inds_labels_all)
+
+# for lab in ex_labels_valid:
+    
+#     print(lab, inds_labels_all[lab])
+    
+    
         
     def buildTimeTable(self):
         """Construct a time table where rank i corresponds to MCS label i, and each column is a time metric:
@@ -153,7 +207,7 @@ class LifeCycleMapping():
         date_day = int(date_str)
         date_30mn = int((str(date_str).split('.')[-1]).ljust(2,'0')) #ljust
         # compute time delta
-        td = timedelta(days = int(date_str),seconds = date_30mn*30*60)
+        td = dt.timedelta(days = int(date_str),seconds = date_30mn*30*60)
         
         # return
         return td
@@ -232,7 +286,7 @@ class LifeCycleMapping():
     def getLabelsInSegMask(self,segmask):
         """Returns a list of labels appearing in segmentation mask"""
 
-        seg_1D = segmask.values.flatten()
+        seg_1D = segmask.flatten()
         seg_1D_nonans = seg_1D[~np.isnan(seg_1D)]
 
         return np.unique(np.array(seg_1D_nonans,dtype=int))
@@ -316,10 +370,10 @@ class LifeCycleMapping():
 
         if metric == 'age':
             # age
-            metric_valid = (i_t-i_t_min_valid)/2
+            metric_valid = (i_t-i_t_min_valid)*self.timestep
         elif metric == 'norm_age':
             # normalized age
-            metric_valid = (i_t-i_t_min_valid)/2/durations_valid
+            metric_valid = (i_t-i_t_min_valid)*self.timestep/durations_valid
         elif metric == 'duration':
             # duration
             metric_valid = durations_valid
@@ -336,7 +390,8 @@ class LifeCycleMapping():
         #- return result
         
         return metric
-        
+    
+    
     
     def compositeMcsAgeOnDist(self,i_t,segmask,sample,dist_var,xymask=True,mask_T='allT',diag='mean',metric='age'):
         """Compute an array of MCS ages from a sample for each percentile.
@@ -359,7 +414,6 @@ class LifeCycleMapping():
         # 1'. compute mask of durations (from mask_T)
         duration = self.computeAgesFromSegMask(i_t,segmask,'duration').flatten()
         
-        dt = 0.5
         if mask_T == 'allT':
             
             Tmask = np.full(duration.size,True)
@@ -369,7 +423,7 @@ class LifeCycleMapping():
             # get Tmin from argument
             Tmin = int(mask_T[3:][:-2])
             # extract mask
-            Tmask = np.greater(duration,int(Tmin/dt))
+            Tmask = np.greater(duration,int(Tmin/self.timestep))
             
         elif re.compile('btw.*and.*hr').match(mask_T):
             
@@ -377,8 +431,8 @@ class LifeCycleMapping():
             Tmin = int(mask_T.split('and')[0][3:])
             Tmax = int(mask_T.split('and')[1][:-2])
             # extract mask
-            Tmask_min = np.greater(duration,int(Tmin/dt))
-            Tmask_max = np.logical_not(np.greater(duration,int(Tmax/dt)))
+            Tmask_min = np.greater(duration,int(Tmin/self.timestep))
+            Tmask_max = np.logical_not(np.greater(duration,int(Tmax/self.timestep)))
             Tmask = np.logical_and(Tmask_min,Tmask_max)
         
         # 2. digitize sample values in distribution bins

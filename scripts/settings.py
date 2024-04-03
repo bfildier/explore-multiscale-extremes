@@ -26,7 +26,7 @@ else:
     DIR_RCEMIP = '/scratchx/bfildier/RCEMIP/SAM'
     DIR_TOOCANSEG_RCEMIP = '/bdd/MT_WORKSPACE/MCS/RCE/SAM/TOOCAN/TOOCAN_v2022_04/irtb'
     
-    
+
 DIR_DATA = '../input'
 DIR_FIG = '../figures'
 DIR_OUT = '../results'
