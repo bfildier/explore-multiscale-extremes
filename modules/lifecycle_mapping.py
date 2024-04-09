@@ -13,6 +13,27 @@ import warnings
 
 import datetime as dt
 
+# TOOCAN specs
+
+toocan_version = 'v2.08'
+toocan_version_str = toocan_version.replace('.','')
+
+if toocan_version == 'v2.07':
+    label_key = 'label'
+    duration_key = 'duration'
+    area_key = 'surfkm2_172Wm2'
+    utime_init_key = 'Utime_Init'
+    utime_end_key = 'Utime_End'
+    utime_key = 'Utime'
+elif toocan_version == 'v2.08':
+    label_key = 'DCS_number'
+    duration_key = 'INT_duration'
+    area_key = 'LC_surfkm2_235K'
+    utime_init_key = 'INT_UTC_timeInit'
+    utime_end_key = 'INT_UTC_timeEnd'
+    utime_key = 'LC_UTC_time'
+
+
 class LifeCycleMapping():
     
     ###--- Class constructor
@@ -30,13 +51,13 @@ class LifeCycleMapping():
         
         # self.dist = dist
         self.timestep = timestep # in hours
-        self.relation_table = relation_table
+        self.relation_table = relation_table # still v2.07
         self.toocan_timetable = toocan_timetable
         self.toocan = toocan
         self.N_MCS = len(self.toocan) if self.toocan is not None else 0
         
         # store list of toocan attributes to speed up later calculation
-        self.labels_toocan = [self.toocan[i].label for i in range(self.N_MCS)] if self.toocan is not None else []
+        self.labels_toocan = [getattr(self.toocan[i],label_key) for i in range(self.N_MCS)] if self.toocan is not None else []
         
         # store list of toocan labels that appear for several MCSs
         self.findDuplicateLabels()
@@ -173,18 +194,18 @@ class LifeCycleMapping():
             MCS = self.toocan[i_MCS]
 
             # label
-            label = MCS.label
+            label = getattr(MCS,label_key)
 
             if label in self.labels_valid:
-                
+
                 # birth
-                i_t_min = np.where(self.relation_table.UTC == MCS.Utime_Init)[0][0]
+                i_t_min = self.utime2i_t(getattr(MCS,utime_init_key),toocan_version=toocan_version)
 
                 # death
-                i_t_max = np.where(self.relation_table.UTC == MCS.Utime_End)[0][0]
+                i_t_max = self.utime2i_t(getattr(MCS,utime_end_key),toocan_version=toocan_version)
 
                 # duration (equal (i_t_max-i_t_min+1)*0.5 hrs)
-                duration = MCS.duration
+                duration = getattr(MCS,duration_key)
 
                 # save
                 self.time_table.loc[label] = pd.Series({'label':label,'i_t_min':i_t_min,'i_t_max':i_t_max,'duration':duration})
@@ -202,12 +223,18 @@ class LifeCycleMapping():
         return i_MCS
         
     def timeIndex2Timedelta(self,i_MCS,j_t_MCS):
-    
-        date_str = self.toocan[i_MCS].clusters.Utime[j_t_MCS]
-        date_day = int(date_str)
-        date_30mn = int((str(date_str).split('.')[-1]).ljust(2,'0')) #ljust
-        # compute time delta
-        td = dt.timedelta(days = int(date_str),seconds = date_30mn*30*60)
+
+        date_value = getattr(self.toocan[i_MCS].clusters,utime_key)[j_t_MCS]
+                                   
+        if toocan_version == 'v2.07':
+
+            date_30mn = int((str(date_value).split('.')[-1]).ljust(2,'0')) #ljust
+            # compute time delta
+            td = dt.timedelta(days = int(date_value),seconds = date_30mn*30*60)
+                                   
+        elif toocan_version == 'v2.08': # check that is gives reasonable ages
+                                   
+            td = dt.timedelta(seconds=date_value) # in v2.08, stored value is seconds since 1970-01-01
         
         # return
         return td
@@ -217,6 +244,36 @@ class LifeCycleMapping():
         
         i_t = np.where(self.relation_table.UTC == Utime)[0][0]
         
+        return i_t
+    
+    def utime2i_t(self,utime,toocan_version):
+        """Convert utime value (i.e. TOOCAN object attribute) into time index since beginning"""
+
+        utime_v207_0 = self.relation_table.UTC[0]
+        assert utime_v207_0 == 17014.03
+
+        if toocan_version == 'v2.07':
+
+            delta_utime = np.round(utime-utime_v207_0,2)
+            n_days = int(str(delta_utime).split('.')[0])
+            n_steps = int(str(delta_utime).split('.')[1])
+
+            i_t = n_days*48 + n_steps
+
+        elif toocan_version == 'v2.08':
+
+            # reference time
+            utime_v208_0 = datetime2Utime(utime2Datetime(utime_v207_0,
+                                                     toocan_version='v2.07'),
+                                      toocan_version='v2.08')
+
+            # calculate
+            delta_utime = utime-utime_v208_0
+            i_t = int(delta_utime/30/60)
+
+        else:
+            print('TOOCAN version not recognized')
+
         return i_t
     
     def getAgeMCS(self,i_t,label,time_MCS='current'):
@@ -236,7 +293,7 @@ class LifeCycleMapping():
         i_MCS = self.indexOfLabel(label)
         # index of slice in TOOCAN lifecycle for current time
         if time_MCS == 'current':
-            j_t_MCS = np.where(self.toocan[i_MCS].clusters.Utime == self.relation_table.loc[i_t].UTC)[0][0]
+            j_t_MCS = np.where(getattr(self.toocan[i_MCS].clusters,utime_key) == self.relation_table.loc[i_t].UTC)[0][0]
         elif time_MCS == 'end':
             j_t_MCS = -1
         # birth time
@@ -256,7 +313,7 @@ class LifeCycleMapping():
         i_MCS = self.indexOfLabel(label)
 
         # check if current label occurs in current segmentation mask
-        time_match = bool(np.any(segmask == self.toocan[i_MCS].label).data)
+        time_match = bool(np.any(segmask == getattr(self.toocan[i_MCS],label_key)).data)
 
         if time_match:
 
@@ -370,10 +427,10 @@ class LifeCycleMapping():
 
         if metric == 'age':
             # age
-            metric_valid = (i_t-i_t_min_valid)*self.timestep
+            metric_valid = (np.array(i_t-i_t_min_valid,dtype=int))*self.timestep
         elif metric == 'norm_age':
             # normalized age
-            metric_valid = (i_t-i_t_min_valid)*self.timestep/durations_valid
+            metric_valid = (np.array(i_t-i_t_min_valid,dtype=int))*self.timestep/durations_valid
         elif metric == 'duration':
             # duration
             metric_valid = durations_valid

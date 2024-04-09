@@ -2,12 +2,11 @@
 
 load precipitation and toocan, and map MCS properties and rain maximum onto MCS lifecycle
 
-! Works for early version of TOOCAN. To update with new versions
+! Works for version TOOCAN v2.07 and v2.08 (chosen manually). For newest versions, update the following:
 - TOOCAN time table
 - relation_table
 
-
-B. Fildier February 2024
+B. Fildier February 2024 -- April 2024
 """
 
 ##--- Python modules
@@ -63,17 +62,35 @@ def defineDir(workdir,verbose=True):
 # to access segmentation files and simulation outputs
 from fcns_load_DYAMOND_SAM import *
 # to access TOOCAN objects
-from load_TOOCAN_DYAMOND_modif_BF import *
+# from load_TOOCAN_DYAMOND_modif_BF import *
+from load_TOOCAN_v208_DYAMOND import * # !! for version v2.08 !
 # mapping function
 from lifecycle_mapping import *
 
+# TOOCAN specs
+
+toocan_version = 'v2.08'
+toocan_version_str = toocan_version.replace('.','')
+
+if toocan_version == 'v2.07':
+    label_key = 'label'
+    duration_key = 'duration'
+    area_key = 'surfkm2_172Wm2'
+    utime_init_key = 'Utime_Init'
+    utime_end_key = 'Utime_End'
+elif toocan_version == 'v2.08':
+    label_key = 'DCS_number'
+    duration_key = 'INT_duration'
+    area_key = 'LC_surfkm2_235K'
+    utime_init_key = 'INT_UTC_timeInit'
+    utime_end_key = 'INT_UTC_timeEnd'
 
 ##-- functions for output setup
 
 def loadTOOCANTimeTable():
     
     # set location on disk and check if exists
-    timetable_file = 'TOOCAN_time_table.csv'
+    timetable_file = 'TOOCAN_time_table%s.csv'%toocan_version_str
     timetable_path = os.path.join(DIR_DATA,timetable_file)
 
     # check if table exists on disk
@@ -92,8 +109,43 @@ def loadTOOCANTimeTable():
 
     else:
 
-         toocan_timetable = None
+         toocan_timetable = makeTOOCANTimeTable()
             
+    return toocan_timetable
+
+def makeTOOCANTimeTable():
+    
+    #-- initialize
+    toocan_timetable = pd.DataFrame(columns=['label','i_t_min','i_t_max','duration'], index=np.arange(np.nanmax(labels_toocan)))
+    
+    #-- fill
+    for i_MCS in tqdm(range(len(toocan))):
+
+        # if i_MCS%10000 == 0:
+        #     print(i_MCS,end='..')
+
+        MCS = toocan[i_MCS]
+
+        # label
+        label = getattr(MCS,label_key)
+
+        # birth
+        i_t_min = utime2i_t(getattr(MCS,utime_init_key),toocan_version=toocan_version)
+
+        # death
+        i_t_max = utime2i_t(getattr(MCS,utime_end_key),toocan_version=toocan_version)
+
+        # duration (equal (i_t_max-i_t_min+1)*0.5 hrs)
+        duration = getattr(MCS,duration_key)
+
+        # save
+        toocan_timetable.loc[label] = pd.Series({'label':label,'i_t_min':i_t_min,'i_t_max':i_t_max,'duration':duration})
+    
+    #--- Save to disk 
+    if overwrite or not table_exists:
+        print('saving to %s'%timetable_path)
+        toocan_timetable.to_csv(timetable_path)
+        
     return toocan_timetable
 
 def initLifeCycleMappingObject():
@@ -107,7 +159,7 @@ def initLifeCycleMappingObject():
     toocan = loadAllMCSs(DIR_TOOCAN_DYAMOND,load_TOOCAN_DYAMOND)
     
     # list of TOOCAN labels, for quicker mapping on toocan list
-    labels_toocan = [toocan[i].label for i in range(len(toocan))]
+    labels_toocan = [getattr(toocan[i],label_key) for i in range(len(toocan))]
     
     # load TOOCAN timetable
     toocan_timetable = loadTOOCANTimeTable()
@@ -166,7 +218,7 @@ def initOutputArray(label_toocan,age):
 
     return ds
 
-def fillWithTrackingData(ds):
+def fillWithTrackingData(ds,label_toocan,lcm):
     """Fill output array with relevant lifecycle data retrieved during tracking.
     
     Arguments:
@@ -179,30 +231,81 @@ def fillWithTrackingData(ds):
 
     #-- then, only where labels are valid:
     # birth times
-    ds['time_birth'][ds['valid_flag']] = np.array([Utime2Datetime(lcm.toocan[lcm.toocan_index_of_label[lcm.labels_valid[i]]].Utime_Init) for i in range(len(lcm.labels_valid))])
+    ds['time_birth'][ds['valid_flag']] = np.array([utime2Datetime(getattr(lcm.toocan[lcm.toocan_index_of_label[lcm.labels_valid[i]]],utime_init_key),toocan_version) for i in range(len(lcm.labels_valid))])
 
     # death times
-    ds['time_death'][ds['valid_flag']] = np.array([Utime2Datetime(lcm.toocan[lcm.toocan_index_of_label[lcm.labels_valid[i]]].Utime_End) for i in range(len(lcm.labels_valid))])
+    ds['time_death'][ds['valid_flag']] = np.array([utime2Datetime(getattr(lcm.toocan[lcm.toocan_index_of_label[lcm.labels_valid[i]]],utime_end_key),toocan_version) for i in range(len(lcm.labels_valid))])
 
     # durations
-    ds['duration'][ds['valid_flag']] = np.array([lcm.toocan[lcm.toocan_index_of_label[lcm.labels_valid[i]]].duration for i in range(len(lcm.labels_valid))])
+    ds['duration'][ds['valid_flag']] = np.array([getattr(lcm.toocan[lcm.toocan_index_of_label[lcm.labels_valid[i]]],duration_key) for i in range(len(lcm.labels_valid))])
 
     # areas
-    ds['area'][ds['valid_flag']] = formatLifecycleData('surfkm2_172Wm2')
+    ds['area'][ds['valid_flag']] = formatLifecycleData(area_key,lcm,N_ages=ds['area'].shape[1])
     
     
-
-def Utime2Datetime(Utime):
+def utime2Datetime(Utime,toocan_version):
     """Convert Utime (as in TOOCAN objects) into datetime.datetime objects"""
     
-    days = int(str(Utime).split('.')[0])
-    n_steps = int(str(Utime).split('.')[1])
+    if toocan_version == 'v2.07':
+        
+        days = int(str(Utime).split('.')[0])
+        n_steps = int(str(Utime).split('.')[1])
     
-    date = np.datetime64(dt.datetime(1970,1,1) + dt.timedelta(seconds=days*86400+n_steps*30*60))
+        date = np.datetime64(dt.datetime(1970,1,1) + dt.timedelta(seconds=days*86400+n_steps*30*60))
+        
+    elif toocan_version == 'v2.08':
+        
+        date = np.datetime64(dt.datetime(1970,1,1) + dt.timedelta(seconds=Utime))
     
     return date
 
-def formatLifecycleData(TOOCAN_attr):
+def datetime2Utime(date,toocan_version):
+    """Convert datetime.datetime object into Utime (as in TOOCAN objects)"""
+    
+    delta_t = pd.to_datetime(date) - dt.datetime(1970,1,1)
+    n_days = delta_t.days
+    n_steps = int(delta_t.seconds/60/30)
+
+    if toocan_version == 'v2.07': 
+        
+        utime = n_days+n_steps/100
+        
+    elif toocan_version == 'v2.08':
+        
+        utime = n_days*24*3600 + n_steps*30*60
+    
+    return utime
+
+def utime2i_t(utime,toocan_version): # NOW REDUNDANT with LCM object attribute
+    """Convert utime value (i.e. TOOCAN object attribute) into time index since beginning"""
+    
+    utime_v207_0 = 17014.03
+    
+    if toocan_version == 'v2.07':
+        
+        delta_utime = np.round(utime-utime_v207_0,2)
+        n_days = int(str(delta_utime).split('.')[0])
+        n_steps = int(str(delta_utime).split('.')[1])
+    
+        i_t = n_days*48 + n_steps
+        
+    elif toocan_version == 'v2.08':
+        
+        # reference time
+        utime_v208_0 = datetime2Utime(utime2Datetime(utime_v207_0,
+                                                 toocan_version='v2.07'),
+                                  toocan_version='v2.08')
+        
+        # calculate
+        delta_utime = utime-utime_v208_0
+        i_t = int(delta_utime/30/60)
+        
+    else:
+        print('TOOCAN version not recognized')
+        
+    return i_t
+
+def formatLifecycleData(TOOCAN_attr,lcm,N_ages):
     """Convert variables stored along lifecycle in TOOCAN and format them as matrix to feed in output file"""
     
     # get values
@@ -356,9 +459,10 @@ def assignVarMaxToOutput(ds,varnames,lcm,df):
     
     #- compute indices of ordered valid labels (where to assign prec_max) in labels_valid
     
-    print('store df data at time index %d'%(df.i_t))
+    print('store df data at time index %d'%(df.attrs['i_t']))
     
-    a = lcm.labels_toocan
+    # a = lcm.labels_toocan
+    a = lcm.labels_valid
     b = df['label'].values
     
     # show labels that are in df_max but not in lcm.labels_toocan
@@ -380,18 +484,21 @@ def assignVarMaxToOutput(ds,varnames,lcm,df):
     
     # create coordinates
     coords = np.vstack([ind_lab_t,ind_age_t])
-    flat_indices = np.ravel_multi_index(coords, ds['%s_max'%key].shape)
+    assert len(a) == ds['prec_max'].shape[0], "number of labels differ"
+    flat_indices = np.ravel_multi_index(coords, ds['prec_max'].shape)
 
     #- assign in output xarray
     for key in varnames:
         
         try:
             
+            # assign
             np.put(ds['%s_max'%key].values,flat_indices,df[key])
 
         except IndexError:
+            
             print('IndexError ! ')
-            print('occured during assignment assignVarMaxToOutput, for rel_table time index %d'%(df.i_t))
+            print('occured during assignment assignVarMaxToOutput, for rel_table time index %d'%(df.attrs['i_t']))
             print('for key %s'%(key))
             print('labels :')
             print(a[ind_age_t])
@@ -431,11 +538,11 @@ if __name__ == "__main__":
                     help='number of indices in a row to analyze')
     parser.add_argument('-r','--region',type=str,default='tropics',
                     help='region of analysis')
-    parser.add_argument('-n_ages',type=int,default=96,
+    parser.add_argument('--n_ages',type=int,default=96,
                         help='number of time steps in age coordinate')
-    parser.add_argument('-dt',type=float,default=0.5,
+    parser.add_argument('--dt',type=float,default=0.5,
                         help='model time step (hours)')
-    parser.add_argument('--n_proc',type=int,default=4,
+    parser.add_argument('--n_proc',type=int,default=1,
                         help='number of simultaneous processes for parallelization')
 
     args = parser.parse_args()
@@ -463,8 +570,8 @@ if __name__ == "__main__":
     
     #- define LifeCycleMappingObject
     
-    lcm_obj_name = 'lcm.pickle'
-    lcm_path = os.path.join(out_dir,'lcm.pickle')
+    lcm_obj_name = 'lcm_%s.pickle'%toocan_version_str
+    lcm_path = os.path.join(out_dir,lcm_obj_name)
 
     if len(glob.glob(lcm_path)) > 0: # then already exists
         
@@ -483,7 +590,8 @@ if __name__ == "__main__":
     #- define coordinates
     
     # define label coordinate
-    label_toocan = lcm.labels_toocan
+    # label_toocan = lcm.labels_toocan
+    label_toocan = lcm.labels_valid  # !!! ignore duplicate labels
     # define age
     age = np.arange(N_ages)*lcm.timestep # in hours
     
@@ -494,7 +602,7 @@ if __name__ == "__main__":
     ds = initOutputArray(label_toocan,age)
     
     #- Fill output array with toocan characteristics
-    fillWithTrackingData(ds)
+    fillWithTrackingData(ds,label_toocan,lcm)
     
     print("--- %s seconds ---" % (time.time() - start_time))
     print('> start time loop')    
@@ -540,7 +648,7 @@ if __name__ == "__main__":
     print("Loop stopped ; %d seconds "% (time.time() - start_time))
     
     #-- save output xarray
-    outfile_root = os.path.join(out_dir,'lifecycle_diag_DYAMOND_Summer_SAM')
+    outfile_root = os.path.join(out_dir,'lifecycle_diag_DYAMOND_Summer_SAM_%s'%toocan_version_str)
     N_file = len(glob.glob(outfile_root+'_*.nc'))
     outfile_name = outfile_root+'_%d.nc'%N_file
     print('Save output to %s'%outfile_name)

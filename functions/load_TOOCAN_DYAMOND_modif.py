@@ -241,5 +241,5 @@ def load_TOOCAN_DYAMOND(FileTOOCAN):
 
     return data    
 
-fileTracking="/data/fiolleau/DYAMOND/TOOCAN/TOOCAN_v2.07_olr/GLOBAL/2016/FileTracking/TOOCAN-GLOBAL-20160801-20160831.dat.gz"
+# fileTracking="/data/fiolleau/DYAMOND/TOOCAN/TOOCAN_v2.07_olr/GLOBAL/2016/FileTracking/TOOCAN-GLOBAL-20160801-20160831.dat.gz"
 #data           = load_TOOCAN_DYAMOND(fileTracking)

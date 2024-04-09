@@ -6,10 +6,12 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 #SBATCH --ntasks=8
+##SBATCH --ntasks-per-node=2
+##SBATCH --ntasks=2
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=120g
-#SBATCH --time=00:20:00
-##SBATCH --time=04:00:00
+##SBATCH --time=00:15:00
+#SBATCH --time=05:00:00
 #SBATCH --job-name=lcm_lagrangian
 
 # job information
@@ -29,8 +31,8 @@ echo 'load conda environment'
 conda activate pyLMD
 
 echo 'execute python script'
-# python computeLifeCycleMappingLagrangian.py --n_proc=8
+python computeLifeCycleMappingLagrangian.py --n_proc=8 --n_ages=240
 # python computeLifeCycleMappingLagrangian.py --n_proc=8  --ninds=96
-python computeLifeCycleMappingLagrangian.py --n_proc=8 --index 1880 --ninds=36
+# python computeLifeCycleMappingLagrangian.py --n_proc=2 --index 1910 --ninds=6 --n_ages=240
 
 exit 0

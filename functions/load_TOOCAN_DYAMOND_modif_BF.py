@@ -197,7 +197,6 @@ def load_TOOCAN_DYAMOND(FileTOOCAN):
     for iline in lines:
         Values = iline.split()
         #print(iline,Values)
-
     
         if Values[0] == '==>':
         

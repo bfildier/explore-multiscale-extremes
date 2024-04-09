@@ -44,22 +44,39 @@ def loadRelTable(which='DYAMOND_SEG'):
 
     return df
 
-def loadTOOCANSeg(i_t,df):
+def loadTOOCANSeg(i_t,df,toocan_version='v2.08',keep_path=True):
 
-    full_path = '/'+df.iloc[i_t]['img_seg_path']
-    
-    if DIR_TOOCANSEG_DYAMOND is None:
-        path_TOOCAN = full_path
-    else:
-
-        filename = os.path.basename(full_path)
-        date = os.path.basename(os.path.dirname(full_path))
-        path_TOOCAN = os.path.join(DIR_TOOCANSEG_DYAMOND,date,filename)
+    if toocan_version == 'v2.07':
+            
+        full_path = '/'+df.iloc[i_t]['img_seg_path']
+        print(full_path)
+            
+        if DIR_TOOCANSEG_DYAMOND is None or keep_path:
+            path_TOOCAN = full_path
+        else :
+            filename = os.path.basename(full_path)
+            date = os.path.basename(os.path.dirname(full_path))
+            path_TOOCAN = os.path.join(DIR_TOOCANSEG_DYAMOND,date,filename)
+            
+        # Load TOOCAN data
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            img_TOOCAN = xr.open_dataarray(path_TOOCAN)
         
-    # Load TOOCAN data
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        img_TOOCAN = xr.open_dataarray(path_TOOCAN)
+    elif toocan_version == 'v2.08':
+        
+        assert toocan_version in DIR_TOOCANSEG_DYAMOND, 'wrong TOOCAN version'
+        date_key = '-0'.join(df['img_seg_path'][i_t].split('_')[-1].split('-'))
+        year = date_key[:4]
+        month = date_key[4:6]
+        day = date_key[6:8]
+        filename = 'mcs_mask_TOOCAN_SAM_'+date_key
+        path_TOOCAN = os.path.join(DIR_TOOCANSEG_DYAMOND,'%s_%s_%s'%(year,month,day),filename)
+        
+        # Load TOOCAN data
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            img_TOOCAN = xr.open_dataset(path_TOOCAN).cloud_mask
     
     return img_TOOCAN
 
