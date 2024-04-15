@@ -1095,6 +1095,45 @@ class ConditionalDistribution():
             self.cond_var = apply2vector(np.nanvar,sample)
 
         self.cond_std = np.sqrt(self.cond_var)
+        
+    def computeConditionalPercentile(self,sample,rank,verbose=False):
+        """! rank is an integer"""
+        
+        # Abort if sample points for each percentile has not been computed yet
+        if self.on is None or not self.on.bin_locations_stored:
+            raise EmptyDataset("Abort: must calculate bin locations of reference distribution first")
+
+        # format dataset and test validity of input dataset
+        Nz, sample = self.formatDimensions(sample)
+
+        # Initialize storing arrays
+        if self.is3D:
+            setattr(self,'cond_perc%d'%rank,np.nan*np.zeros((Nz,self.on.nbins)))
+
+        # Access sample points to calculate conditional stats
+        # automate
+        def apply2vector(fun,vector):
+            out = np.nan*np.zeros(self.on.nbins)
+            for i_b in range(self.on.nbins): # loop over bins
+                subsample = np.take(vector,self.on.bin_locations[i_b])
+                if subsample.size == 0:
+                    if verbose:
+                        print('passing bin %d, subsample of size %d'%(i_b,subsample.size))
+                    # pass
+                else:
+                    if verbose:
+                        print("bin %d, result:%2.2f"%(i_b,fun(subsample)))
+                    out[i_b] = fun(subsample)
+            return out
+        # compute
+        if self.is3D:
+            for i_z in range(Nz): # loop over heights
+                getattr(self,'cond_perc%d'%rank)[i_z] = apply2vector(lambda x: np.nanpercentile(x,rank),
+                                                                     np.squeeze(sample[i_z]))
+        else:
+            setattr(self,'cond_perc%d'%rank,apply2vector(lambda x: np.nanpercentile(x,rank),sample))
+
+        
 
 class DistributionOverTime(Distribution):
     """Time evolution of an object of class Distribution.

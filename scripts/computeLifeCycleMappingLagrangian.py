@@ -153,7 +153,9 @@ def initLifeCycleMappingObject():
     #-- prerequisites to LCM object
     
     # load relation table
-    relation_table = loadRelTable('DYAMOND_SEG')
+    # relation_table = loadRelTable('DYAMOND_SEG') 
+    relation_table = None # Choose to bypass relation table in all following calculations
+    ### CURRENTLY ADAPTING MULTIMODEL HERE --> check where relation table is used
     
     # load TOOCAN (.gz version)
     toocan = loadAllMCSs(DIR_TOOCAN_DYAMOND,load_TOOCAN_DYAMOND)
@@ -544,6 +546,10 @@ if __name__ == "__main__":
                         help='model time step (hours)')
     parser.add_argument('--n_proc',type=int,default=1,
                         help='number of simultaneous processes for parallelization')
+    parser.add_argument('--resolution',type=str,default='4km-30mn',
+                        help='data resolution (4km-30mn,MCSMIP, etc.)')
+    parser.add_argument('--model',type=str,default='SAM',
+                        help='model name (ARPEGE FV3 IFS MPAS NICAM OBS SAM UM)')
 
     args = parser.parse_args()
 
@@ -554,6 +560,8 @@ if __name__ == "__main__":
     N_ages = args.n_ages
     timestep = args.dt
     n_proc = args.n_proc
+    resolution = args.resolution
+    model = args.model
     
     # output directory
     out_dir = os.path.join(DIR_OUT,region,'life_cycle_mapping')
@@ -566,7 +574,6 @@ if __name__ == "__main__":
         
     print("--- %s seconds ---" % (time.time() - start_time))
     print('> create LifeCycleMapping object')
-    
     
     #- define LifeCycleMappingObject
     
@@ -581,7 +588,7 @@ if __name__ == "__main__":
     else:
         
         # initialize
-        lcm = initLifeCycleMappingObject()
+        lcm = initLifeCycleMappingObject() ### CURRENTLY ADAPTING MULTIMODEL HERE
 
         # save
         pickle.dump(lcm,open(lcm_path,'wb'))

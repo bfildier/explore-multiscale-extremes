@@ -10,12 +10,28 @@ from settings import *
 ## current script object
 fcnload_module = sys.modules[__name__]
 
-def loadPrecac(i_t,df):
+
+def loadRelTable(which='DYAMOND_SEG'):
     
-    root = df.iloc[i_t]['path_dyamond']
-    file_precac = root+'.Precac.2D.nc'
-    # load
-    precac = xr.open_dataarray(os.path.join(DIR_DYAMOND,file_precac)).load()[0]
+    # relation table DYAMOND-SAM -- TOOCAN segmentation masks
+    if which == 'DYAMOND_SEG':
+        df = pd.read_csv(os.path.join(DIR_DATA,'relation_2_table_UTC_dyamond_segmentation.csv'))
+        df.sort_values(by='UTC',ignore_index=True,inplace=True)
+
+    return df
+
+def loadPrecac(i_t,df=None):
+    
+    if df is not None:
+
+        root = df.iloc[i_t]['path_dyamond']
+        file_precac = root+'.Precac.2D.nc'
+        # load
+        precac = xr.open_dataarray(os.path.join(DIR_DYAMOND,file_precac)).load()[0]
+    
+    else:
+        
+        pass
     
     return precac
 
@@ -34,15 +50,6 @@ def loadPrec(i_t,df):
     gc.collect()
     
     return prec
-
-def loadRelTable(which='DYAMOND_SEG'):
-    
-    # relation table DYAMOND-SAM -- TOOCAN segmentation masks
-    if which == 'DYAMOND_SEG':
-        df = pd.read_csv(os.path.join(DIR_DATA,'relation_2_table_UTC_dyamond_segmentation.csv'))
-        df.sort_values(by='UTC',ignore_index=True,inplace=True)
-
-    return df
 
 def loadTOOCANSeg(i_t,df,toocan_version='v2.08',keep_path=True):
 
