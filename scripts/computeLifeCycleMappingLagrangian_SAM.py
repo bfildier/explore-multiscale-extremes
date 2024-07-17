@@ -1,14 +1,12 @@
 """script computeLifeCycleMappingLagrangian.py
 
-Extension of script computeLifeCycleMappingLagrangian_SAM.py to all DYAMOND models.
-
 load precipitation and toocan, and map MCS properties and rain maximum onto MCS lifecycle
 
 ! Works for version TOOCAN v2.07 and v2.08 (chosen manually). For newest versions, update the following:
 - TOOCAN time table
 - relation_table
 
-B. Fildier June 2024 -- July 2024
+B. Fildier February 2024 -- April 2024
 """
 
 ##--- Python modules
@@ -62,16 +60,16 @@ def defineDir(workdir,verbose=True):
 #-- load own libraries
 
 # to access segmentation files and simulation outputs
-from fcns_load_MCSMIP import *
+from fcns_load_DYAMOND_SAM import *
 # to access TOOCAN objects
-from load_TOOCAN_DYAMOND_modif_BF import *
-# from load_TOOCAN_v208_DYAMOND import * # !! for version v2.08 !
+# from load_TOOCAN_DYAMOND_modif_BF import *
+from load_TOOCAN_v208_DYAMOND import * # !! for version v2.08 !
 # mapping function
 from lifecycle_mapping import *
 
 # TOOCAN specs
 
-toocan_version = 'v2.07'
+toocan_version = 'v2.08'
 toocan_version_str = toocan_version.replace('.','')
 
 if toocan_version == 'v2.07':
@@ -80,7 +78,6 @@ if toocan_version == 'v2.07':
     area_key = 'surfkm2_172Wm2'
     utime_init_key = 'Utime_Init'
     utime_end_key = 'Utime_End'
-    
 elif toocan_version == 'v2.08':
     label_key = 'DCS_number'
     duration_key = 'INT_duration'
@@ -93,7 +90,7 @@ elif toocan_version == 'v2.08':
 def loadTOOCANTimeTable():
     
     # set location on disk and check if exists
-    timetable_file = 'TOOCAN_time_table_%s_%s.csv'%(model,toocan_version_str)
+    timetable_file = 'TOOCAN_time_table%s.csv'%toocan_version_str
     timetable_path = os.path.join(DIR_DATA,timetable_file)
 
     # check if table exists on disk
@@ -112,12 +109,7 @@ def loadTOOCANTimeTable():
 
     else:
 
-        toocan_timetable = makeTOOCANTimeTable()
-        
-        #-- save to disk 
-        if overwrite or not table_exists:
-            print('saving to %s'%timetable_path)
-            toocan_timetable.to_csv(timetable_path)
+         toocan_timetable = makeTOOCANTimeTable()
             
     return toocan_timetable
 
@@ -148,6 +140,11 @@ def makeTOOCANTimeTable():
 
         # save
         toocan_timetable.loc[label] = pd.Series({'label':label,'i_t_min':i_t_min,'i_t_max':i_t_max,'duration':duration})
+    
+    #--- Save to disk 
+    if overwrite or not table_exists:
+        print('saving to %s'%timetable_path)
+        toocan_timetable.to_csv(timetable_path)
         
     return toocan_timetable
 
@@ -156,11 +153,12 @@ def initLifeCycleMappingObject():
     #-- prerequisites to LCM object
     
     # load relation table
-    relation_table = loadRelTable(model,toocan_version_str)
-    # relation_table = None # Choose to bypass relation table in all following calculations
+    # relation_table = loadRelTable('DYAMOND_SEG') 
+    relation_table = None # Choose to bypass relation table in all following calculations
+    ### CURRENTLY ADAPTING MULTIMODEL HERE --> check where relation table is used
     
     # load TOOCAN (.gz version)
-    toocan = loadAllMCSs(DIR_TOOCAN_DYAMOND,load_TOOCAN_DYAMOND) ### CURRENTLY NEED TO ADAPT MULTIMODEL HERE
+    toocan = loadAllMCSs(DIR_TOOCAN_DYAMOND,load_TOOCAN_DYAMOND)
     
     # list of TOOCAN labels, for quicker mapping on toocan list
     labels_toocan = [getattr(toocan[i],label_key) for i in range(len(toocan))]
@@ -326,6 +324,9 @@ def formatLifecycleData(TOOCAN_attr,lcm,N_ages):
     
 def loadDataAtSlice(i_t,lcm,lon_slice,lat_slice):
     """Load relevant fields : TOOCAN segmentation mask, precipitation values"""
+    
+    # date
+    date = lcm.relation_table.loc[i_t].str_code
 
     # load segmentation mask for that date
     segmask = np.squeeze(loadTOOCANSeg(i_t,lcm.relation_table)).sel(latitude=lat_slice).data
@@ -345,7 +346,7 @@ def loadDataAtSlice(i_t,lcm,lon_slice,lat_slice):
     i_age_t = np.asarray(MCS_age/lcm.timestep,dtype=int)
     del MCS_age
     
-    return _, segmask, prec, longitude_2D, latitude_2D, i_age_t
+    return date, segmask, prec, longitude_2D, latitude_2D, i_age_t
     
 # def computeMaxPrecAtSlice(segmask, prec, longitude_2D, latitude_2D, i_age_t):
 #     """Compute the maximum precipitation and its coordinates within each MCS label.
@@ -517,7 +518,7 @@ def iteration(i_t):
     print("time step #%d ; %s seconds "% (i_t,time.time() - start_time))
     
     # load data at time step t
-    _, segmask, prec, longitude_2D, latitude_2D, i_age_t = loadDataAtSlice(i_t,lcm,lon_slice,lat_slice)
+    date, segmask, prec, longitude_2D, latitude_2D, i_age_t = loadDataAtSlice(i_t,lcm,lon_slice,lat_slice)
 
     # compute variables at maximum precipitation in each MCS segmentation mask
     # df_max = computeMaxPrecAtSlice(segmask, prec, longitude_2D, latitude_2D, i_age_t)

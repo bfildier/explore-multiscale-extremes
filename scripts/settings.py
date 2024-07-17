@@ -54,6 +54,28 @@ else:
                              '/235K/TOOCAN/TOOCAN_%s/GLOBAL/2016', # expect %(<model or obs>,<toocan_version>)
                              'model_output':'/bdd/MT_WORKSPACE/lgouttes/MODELS/DYAMOND/Summer/%s/235K/TOOCAN/TOOCAN_%s/GLOBAL/2016'}, # expect %(<model or obs>)
                 }
+    FILE_ROOTS = {'MCSMIP':{'model_output':{'ARPEGE':'pr_rlut_arpnh_summer_%s.nc', # expect <%Y%m%d%H>
+                                            'FV3':'pr_rlut_fv3_%s.nc',
+                                            'IFS':'pr_rlut_ifs_summer_%s.nc',
+                                            'MPAS':'pr_rlut_mpas_%s.nc',
+                                            'NICAM':'pr_rlut_nicam_summer_%s.nc',
+                                            'OBS':'merg_%s_4km-pixel.nc',
+                                            'SAM':'pr_rlut_sam_summer_%s.nc',
+                                            'UM':'pr_rlut_um_summer_%s.nc'},
+                            'TOOCANSEG':'mcs_mask_TOOCAN_%s_%s.nc' # expect <model> and <%Y%m%d-0%H+1>
+                           }
+                 }
+    BOUNDS = {'MCSMIP':{'model_output':{'ARPEGE':{'start':'2016080200','end':'2016090923'},
+                                        'FV3':{'start':'2016080101','end':'2016090923'},
+                                        'IFS':{'start':'2016080100','end':'2016090923'},
+                                        'MPAS':{'start':'2016080101','end':'2016091000'},
+                                        'NICAM':{'start':'2016080100','end':'2016090923'},
+                                        'OBS':{'start':'2016080100','end':'2016090923'},
+                                        'SAM':{'start':'2016080101','end':'2016090923'},
+                                        'UM':{'start':'2016080100','end':'2016090923'}
+                                       }
+                       }
+             }
     
     def getDirDYAMOND(resolution,data_type,model_name,toocan_version='v2.07'):
         """Return the full path for model or observation data, for OLR or precipitation data or TOOCAN segmentation.
